@@ -59,6 +59,7 @@ jobs:
           release_name: Release ${{ steps.get_version.outputs.version }}
           draft: false
           prerelease: false
+          token: ${{ secrets.PAT_TOKEN }}
 
       - name: Upload release assets
         id: upload_assets
@@ -71,3 +72,4 @@ jobs:
             sectool-windows.exe
           asset_name: ${{ env.ASSET_NAME }}
           asset_content_type: application/octet-stream
+          token: ${{ secrets.PAT_TOKEN }}
