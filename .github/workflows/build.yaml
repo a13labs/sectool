@@ -20,7 +20,7 @@ jobs:
 
       - name: Get version
         id: get_version
-        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT"
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
       - name: Build for Linux
         run: |
