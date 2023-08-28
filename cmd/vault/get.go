@@ -36,18 +36,18 @@ var getCmd = &cobra.Command{
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) < 1 {
-			fmt.Println("Missing Key and Value")
+			fmt.Println("Missing key and value.")
 			os.Exit(1)
 		}
 		master_pwd, exist := os.LookupEnv("VAULT_MASTER_PASSWORD")
 		if !exist {
-			fmt.Println("VAULT_MASTER_PASSWORD it's not defined. Aborting")
+			fmt.Println("VAULT_MASTER_PASSWORD it's not defined, aborting.")
 			os.Exit(1)
 		}
 		v := vault.NewVault("repository.vault", []byte(master_pwd))
 		raw_value, err := v.VaultGetValue(args[0])
 		if err != nil {
-			fmt.Println("Error getting value")
+			fmt.Println("Error getting value.")
 			os.Exit(1)
 		}
 		value := raw_value
@@ -61,6 +61,7 @@ var getCmd = &cobra.Command{
 		}
 
 		fmt.Println(value)
+		os.Exit(0)
 	},
 }
 

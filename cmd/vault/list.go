@@ -42,7 +42,7 @@ to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		master_pwd, exist := os.LookupEnv("VAULT_MASTER_PASSWORD")
 		if !exist {
-			fmt.Println("VAULT_MASTER_PASSWORD it's not defined. Aborting")
+			fmt.Println("VAULT_MASTER_PASSWORD it's not defined, aborting.")
 			os.Exit(1)
 		}
 		v := vault.NewVault("repository.vault", []byte(master_pwd))

@@ -19,47 +19,74 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package vault
+package ssh
 
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
+	"github.com/a13labs/sectool/internal/crypto"
 	"github.com/a13labs/sectool/internal/vault"
 	"github.com/spf13/cobra"
 )
 
-// setCmd represents the set command
-var setCmd = &cobra.Command{
-	Use:   "set",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+// lockCmd represents the list command
+var lockCmd = &cobra.Command{
+	Use:   "lock",
+	Short: "Lock SSH keys pairs",
+	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) < 2 {
-			fmt.Println("Missing key and value.")
-			os.Exit(1)
-		}
 		master_pwd, exist := os.LookupEnv("VAULT_MASTER_PASSWORD")
 		if !exist {
-			fmt.Println("VAULT_MASTER_PASSWORD it's not defined, aborting")
+			fmt.Println("VAULT_MASTER_PASSWORD it's not defined. Aborting")
 			os.Exit(1)
 		}
-		v := vault.NewVault("repository.vault", []byte(master_pwd))
-		v.VaultEnableBackup(cmd.Flag("backup").Value.String() == "true")
-		err := v.VaultSetValue(args[0], args[1])
+
+		_, err := os.Stat("ssh-keys")
+		if os.IsNotExist(err) {
+			fmt.Println("Missing keys directory, no keys can be listed.")
+			os.Exit(1)
+		}
+
+		keys, err := listKeys("ssh-keys")
 		if err != nil {
-			fmt.Println("Error setting key/value.")
+			fmt.Println("Error listing keys.")
 			os.Exit(1)
 		}
+
+		v := vault.NewVault("repository.vault", []byte(master_pwd))
+		ssh_master_password, err := v.VaultGetValue("SSH_MASTER_PASSWORD")
+		if err != nil {
+			fmt.Println("Error reading SSH_MASTER_PASSWORD, aborting.")
+			os.Exit(1)
+		}
+
+		for _, key := range keys {
+			key_root_path := filepath.Join("ssh-keys", key)
+			key_path := filepath.Join(key_root_path, "id_ecdsa")
+			_, err := os.Stat(key_path)
+			if !os.IsNotExist(err) {
+				key_path := filepath.Join(key_root_path, "id_rsa")
+				_, err := os.Stat(key_path)
+				if !os.IsNotExist(err) {
+					fmt.Printf("No key data in '%s', skipping.\n", key)
+					continue
+				}
+			}
+
+			err = crypto.EncryptFile(key_path, key_path+".key", []byte(ssh_master_password))
+			if err != nil {
+				fmt.Printf("Error encrypting key data in '%s', skipping.\n", key)
+				continue
+			}
+			fmt.Printf("Key data in '%s' locked, cleaning unencrypted data.\n", key)
+			os.Remove(key_path)
+		}
+		os.Exit(0)
 	},
 }
 
 func init() {
-	vaultCmd.AddCommand(setCmd)
-	setCmd.Flags().BoolP("backup", "b", false, "Backup vault.")
+	sshCmd.AddCommand(lockCmd)
 }

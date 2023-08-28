@@ -36,20 +36,22 @@ var delCmd = &cobra.Command{
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) < 1 {
-			fmt.Println("Missing Key")
+			fmt.Println("Missing key.")
 			os.Exit(1)
 		}
 		master_pwd, exist := os.LookupEnv("VAULT_MASTER_PASSWORD")
 		if !exist {
-			fmt.Println("VAULT_MASTER_PASSWORD it's not defined. Aborting")
+			fmt.Println("VAULT_MASTER_PASSWORD it's not defined, aborting.")
 			os.Exit(1)
 		}
 		v := vault.NewVault("repository.vault", []byte(master_pwd))
 		err := v.VaultDelKey(args[0])
 		if err != nil {
-			fmt.Println("Error deleting key")
+			fmt.Println("Error deleting key/value.")
 			os.Exit(1)
 		}
+		fmt.Println("Key/value deleted")
+		os.Exit(0)
 	},
 }
 

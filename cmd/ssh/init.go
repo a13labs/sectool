@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package vault
+package ssh
 
 import (
 	"fmt"
@@ -29,37 +29,35 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// setCmd represents the set command
-var setCmd = &cobra.Command{
-	Use:   "set",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+// initCmd represents the list command
+var initCmd = &cobra.Command{
+	Use:   "init",
+	Short: "Init SSH key pairs management",
+	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) < 2 {
-			fmt.Println("Missing key and value.")
+		if len(args) < 1 {
+			fmt.Println("Missing password.")
 			os.Exit(1)
 		}
+
 		master_pwd, exist := os.LookupEnv("VAULT_MASTER_PASSWORD")
 		if !exist {
-			fmt.Println("VAULT_MASTER_PASSWORD it's not defined, aborting")
+			fmt.Println("VAULT_MASTER_PASSWORD it's not defined, aborting.")
 			os.Exit(1)
 		}
+
 		v := vault.NewVault("repository.vault", []byte(master_pwd))
-		v.VaultEnableBackup(cmd.Flag("backup").Value.String() == "true")
-		err := v.VaultSetValue(args[0], args[1])
-		if err != nil {
-			fmt.Println("Error setting key/value.")
+
+		if v.VaultHasKey("SSH_MASTER_PASSWORD") {
+			fmt.Println("SSH_MASTER_PASSWORD already defined, aborting.")
 			os.Exit(1)
 		}
+
+		v.VaultSetValue("SSH_MASTER_PASSWORD", args[0])
+		fmt.Println("SSH key management successfully initialized.")
 	},
 }
 
 func init() {
-	vaultCmd.AddCommand(setCmd)
-	setCmd.Flags().BoolP("backup", "b", false, "Backup vault.")
+	sshCmd.AddCommand(initCmd)
 }
