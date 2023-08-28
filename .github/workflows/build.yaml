@@ -25,7 +25,7 @@ jobs:
       - name: Build for Linux
         run: |
           go build -o sectool main.go
-          zip sectool-${{ steps.get_version.outputs.version }}-$linux-x64.zip sectool
+          zip sectool-${{ steps.get_version.outputs.version }}-linux-x64.zip sectool
         env:
           GOOS: linux
           GOARCH: amd64
@@ -59,7 +59,7 @@ jobs:
         with:
           name: artifacts
           path: |
-            sectool-${{ steps.get_version.outputs.version }}-$linux-x64.zip
+            sectool-${{ steps.get_version.outputs.version }}-linux-x64.zip
             sectool-${{ steps.get_version.outputs.version }}-windows.zip
             sectool-${{ steps.get_version.outputs.version }}-darwin-x64.zip
             sectool-${{ steps.get_version.outputs.version }}-darwin-arm64.zip
@@ -83,7 +83,7 @@ jobs:
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: |
-            sectool-${{ steps.get_version.outputs.version }}-$linux-x64.zip
+            sectool-${{ steps.get_version.outputs.version }}-linux-x64.zip
             sectool-${{ steps.get_version.outputs.version }}-windows.zip
             sectool-${{ steps.get_version.outputs.version }}-darwin-x64.zip
             sectool-${{ steps.get_version.outputs.version }}-darwin-arm64.zip
