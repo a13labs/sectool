@@ -1,0 +1,73 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*" # Trigger on tags that start with 'v'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.20.7
+
+      - name: Get version
+        id: get_version
+        run: echo "::set-output name=version::${GITHUB_REF#refs/tags/}"
+
+      - name: Build for Linux
+        run: go build -o sectool-linux main.go
+        env:
+          GOOS: linux
+          GOARCH: amd64
+
+      - name: Build for macOS
+        run: go build -o sectool-macos main.go
+        env:
+          GOOS: darwin
+          GOARCH: amd64
+
+      - name: Build for Windows
+        run: go build -o sectool-windows.exe main.go
+        env:
+          GOOS: windows
+          GOARCH: amd64
+
+      - name: Archive artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: artifacts
+          path: |
+            sectool-linux
+            sectool-macos
+            sectool-windows.exe
+
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          release_name: Release ${{ steps.get_version.outputs.version }}
+          draft: false
+          prerelease: false
+
+      - name: Upload release assets
+        id: upload_assets
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: |
+            sectool-linux
+            sectool-macos
+            sectool-windows.exe
+          asset_name: ${{ env.ASSET_NAME }}
+          asset_content_type: application/octet-stream
