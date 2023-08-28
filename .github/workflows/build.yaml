@@ -2,8 +2,6 @@ name: Build and Release
 
 on:
   push:
-    branches:
-      - main
     tags:
       - "v*" # Trigger on tags that start with 'v'
 
@@ -25,22 +23,36 @@ jobs:
         run: echo "::set-output name=version::${GITHUB_REF#refs/tags/}"
 
       - name: Build for Linux
-        run: go build -o sectool-linux main.go
+        run: |
+          go build -o sectool main.go
+          zip sectool-${{ steps.get_version.outputs.version }}-$linux-x64.zip sectool
         env:
           GOOS: linux
           GOARCH: amd64
 
-      - name: Build for macOS
-        run: go build -o sectool-macos main.go
+      - name: Build for Windows
+        run: |
+          go build -o sectool.exe main.go
+          zip sectool-${{ steps.get_version.outputs.version }}-windows.zip sectool
+        env:
+          GOOS: windows
+          GOARCH: amd64
+
+      - name: Build for macOS (Intel)
+        run: |
+          go build -o sectool main.go
+          zip sectool-${{ steps.get_version.outputs.version }}-darwin-x64.zip sectool
         env:
           GOOS: darwin
           GOARCH: amd64
 
-      - name: Build for Windows
-        run: go build -o sectool-windows.exe main.go
+      - name: Build for macOS (Apple Silicon)
+        run: |
+          go build -o sectool main.go
+          zip sectool-${{ steps.get_version.outputs.version }}-darwin-arm64.zip sectool
         env:
-          GOOS: windows
-          GOARCH: amd64
+          GOOS: darwin
+          GOARCH: arm64
 
       - name: Archive artifacts
         uses: actions/upload-artifact@v2
@@ -71,9 +83,10 @@ jobs:
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: |
-            sectool-linux
-            sectool-macos
-            sectool-windows.exe
+            zip sectool-${{ steps.get_version.outputs.version }}-$linux-x64.zip sectool
+            zip sectool-${{ steps.get_version.outputs.version }}-windows.zip sectool
+            zip sectool-${{ steps.get_version.outputs.version }}-darwin-x64.zip sectool
+            zip sectool-${{ steps.get_version.outputs.version }}-darwin-arm64.zip sectool
           asset_name: ${{ env.ASSET_NAME }}
           asset_content_type: application/octet-stream
           token: ${{ secrets.PAT_TOKEN }}
