@@ -1,6 +1,6 @@
 # sectool - Secure Tool for Managing SSH Key Pairs and Secrets
 
-[![Build Status](https://github.com/a13labs/sectool/actions/workflows/build.yml/badge.svg)](https://github.com/a13labs/sectool/actions/workflows/build.yml)
+[![Build Status](https://github.com/a13labs/sectool/actions/workflows/build.yaml/badge.svg)](https://github.com/a13labs/sectool/actions/workflows/build.yaml)
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
