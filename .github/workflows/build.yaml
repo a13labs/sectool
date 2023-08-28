@@ -59,9 +59,10 @@ jobs:
         with:
           name: artifacts
           path: |
-            sectool-linux
-            sectool-macos
-            sectool-windows.exe
+            sectool-${{ steps.get_version.outputs.version }}-$linux-x64.zip
+            sectool-${{ steps.get_version.outputs.version }}-windows.zip
+            sectool-${{ steps.get_version.outputs.version }}-darwin-x64.zip
+            sectool-${{ steps.get_version.outputs.version }}-darwin-arm64.zip
 
       - name: Create release
         id: create_release
