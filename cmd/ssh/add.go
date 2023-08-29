@@ -28,7 +28,7 @@ import (
 
 	"github.com/a13labs/sectool/internal/ssh"
 	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 var key_length int32
@@ -62,13 +62,14 @@ var addCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		algo := ssh.ECDSA
-		if key_algo_str == "rsa" {
-			algo = ssh.RSA
+		algo := ssh.AlgorithmFromString(key_algo_str)
+		prefix := ssh.AlgorithmToString(algo)
+		if key_length == 0 {
+			key_length = ssh.AlgorithmDefaultKeyLength(algo)
 		}
 
-		key_full_path_priv := filepath.Join(key_path, "id_"+key_algo_str)
-		key_full_path_pub := filepath.Join(key_path, "id_"+key_algo_str+".pub")
+		key_full_path_priv := filepath.Join(key_path, "id_"+prefix)
+		key_full_path_pub := filepath.Join(key_path, "id_"+prefix+".pub")
 		_, err = os.Stat(key_full_path_priv)
 		if err == nil {
 			fmt.Println("Key already exists, delete first")
@@ -79,9 +80,21 @@ var addCmd = &cobra.Command{
 		}
 
 		fmt.Print("Enter password: ")
-		password, err := terminal.ReadPassword(int(os.Stdin.Fd()))
+		password, err := term.ReadPassword(int(os.Stdin.Fd()))
 		if err != nil {
 			fmt.Println("Error:", err)
+			return
+		}
+		fmt.Println()
+		fmt.Print("Repeat password: ")
+		password_repeat, err := term.ReadPassword(int(os.Stdin.Fd()))
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		fmt.Println()
+		if string(password) != string(password_repeat) {
+			fmt.Println("Passwords do not match.:")
 			return
 		}
 

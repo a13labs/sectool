@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 
 	"github.com/a13labs/sectool/internal/crypto"
+	"github.com/a13labs/sectool/internal/ssh"
 	"github.com/a13labs/sectool/internal/vault"
 	"github.com/spf13/cobra"
 )
@@ -63,25 +64,27 @@ var lockCmd = &cobra.Command{
 		}
 
 		for _, key := range keys {
+
 			key_root_path := filepath.Join("ssh-keys", key)
-			key_path := filepath.Join(key_root_path, "id_ecdsa")
-			_, err := os.Stat(key_path)
-			if !os.IsNotExist(err) {
-				key_path := filepath.Join(key_root_path, "id_rsa")
+
+			for _, algo := range ssh.GetAvailableAlgorithms() {
+				prefix := ssh.AlgorithmToString(algo)
+				key_path := filepath.Join(key_root_path, "id_"+prefix)
 				_, err := os.Stat(key_path)
-				if !os.IsNotExist(err) {
-					fmt.Printf("No key data in '%s', skipping.\n", key)
+
+				if err != nil {
+					fmt.Printf("No key/pair (%s) in '%s', skipping.\n", prefix, key)
 					continue
 				}
-			}
 
-			err = crypto.EncryptFile(key_path, key_path+".key", []byte(ssh_master_password))
-			if err != nil {
-				fmt.Printf("Error encrypting key data in '%s', skipping.\n", key)
-				continue
+				err = crypto.EncryptFile(key_path, key_path+".key", []byte(ssh_master_password))
+				if err != nil {
+					fmt.Printf("Error encrypting private key (%s) in '%s', skipping.\n", prefix, key)
+					continue
+				}
+				fmt.Printf("Private key (%s) in '%s' locked, cleaning unencrypted data.\n", prefix, key)
+				os.Remove(key_path)
 			}
-			fmt.Printf("Key data in '%s' locked, cleaning unencrypted data.\n", key)
-			os.Remove(key_path)
 		}
 		os.Exit(0)
 	},

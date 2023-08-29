@@ -151,3 +151,45 @@ func getPublicKeyFromPrivateKey(privKey *pem.Block) (ssh.PublicKey, error) {
 		return nil, fmt.Errorf("unsupported private key type: %s", privKey.Type)
 	}
 }
+
+func GetAvailableAlgorithms() []Algorithm {
+	return []Algorithm{ECDSA, RSA}
+}
+
+func AlgorithmFromString(str string) Algorithm {
+
+	if str == "ecdsa" {
+		return ECDSA
+	}
+
+	if str == "rsa" {
+		return RSA
+	}
+
+	return ECDSA
+}
+
+func AlgorithmToString(algo Algorithm) string {
+
+	if algo == ECDSA {
+		return "ecdsa"
+	}
+
+	if algo == RSA {
+		return "rsa"
+	}
+
+	return "ecdsa"
+}
+
+func AlgorithmDefaultKeyLength(algo Algorithm) int32 {
+	if algo == ECDSA {
+		return 256
+	}
+
+	if algo == RSA {
+		return 3072
+	}
+
+	return 256
+}
