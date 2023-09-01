@@ -23,10 +23,9 @@ package main
 
 import (
 	"github.com/a13labs/sectool/cmd"
+	_ "github.com/a13labs/sectool/cmd/exec"
 	_ "github.com/a13labs/sectool/cmd/ssh"
 	_ "github.com/a13labs/sectool/cmd/vault"
-	_ "github.com/a13labs/sectool/internal/crypto"
-	_ "github.com/a13labs/sectool/internal/vault"
 )
 
 func main() {

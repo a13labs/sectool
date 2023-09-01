@@ -25,44 +25,39 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/a13labs/sectool/internal/vault"
+	"github.com/a13labs/sectool/internal/crypto"
 	"github.com/spf13/cobra"
 )
 
-var quoted bool
-
-// getCmd represents the get command
-var getCmd = &cobra.Command{
-	Use:   "get",
-	Short: "Get a key/value from the vault.",
+var unlockCmd = &cobra.Command{
+	Use:   "unlock",
+	Short: "Unlock vault",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) < 1 {
-			fmt.Println("Usage: sectool vault get <key>")
-			os.Exit(1)
-		}
 		master_pwd, exist := os.LookupEnv("VAULT_MASTER_PASSWORD")
 		if !exist {
 			fmt.Println("VAULT_MASTER_PASSWORD it's not defined, aborting.")
 			os.Exit(1)
 		}
-		v := vault.NewVault("repository.vault", []byte(master_pwd))
-		raw_value, err := v.VaultGetValue(args[0])
-		if err != nil {
-			fmt.Println("Error getting value.")
+
+		unlocked_vault := "repository.vault.unlocked"
+		locked_vault := "repository.vault"
+
+		_, err := os.Stat(locked_vault)
+		if os.IsNotExist(err) {
+			fmt.Println("Vault does not exists, nothing to be unlocked.")
 			os.Exit(1)
 		}
-		value := raw_value
-		if quoted {
-			value = "\"" + raw_value + "\""
-		}
 
-		fmt.Println(value)
+		err = crypto.DecryptFile(locked_vault, unlocked_vault, []byte(master_pwd))
+		if err != nil {
+			fmt.Println("Error unlocking vault.")
+			os.Exit(1)
+		}
 		os.Exit(0)
 	},
 }
 
 func init() {
-	vaultCmd.AddCommand(getCmd)
-	getCmd.Flags().BoolVarP(&quoted, "quoted", "q", false, "Quote value")
+	vaultCmd.AddCommand(unlockCmd)
 }
