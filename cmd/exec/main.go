@@ -34,7 +34,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var vault_file string
+var vault_file = ""
 
 func hideSensitiveInfo(input string, sensitiveStrings []string) string {
 	result := input
@@ -45,6 +45,69 @@ func hideSensitiveInfo(input string, sensitiveStrings []string) string {
 }
 
 const pattern = `\s*\$([a-zA-Z_][a-zA-Z0-9_]*)`
+
+func processArgs(args []string) (string, []string) {
+
+	var arguments []string
+	cmd := ""
+	foundFirstArg := false
+
+	i := 0 // Initialize a loop variable
+	for i < len(args) {
+		arg := args[i]
+
+		if !foundFirstArg {
+			if strings.HasPrefix(arg, "--") || strings.HasPrefix(arg, "-") {
+				if arg == "--vault" || arg == "-v" {
+					i++
+					if i == len(args) {
+						fmt.Println("Missing vault file location.")
+						os.Exit(1)
+					}
+					vault_file = args[i]
+					if strings.HasPrefix(vault_file, "--") || strings.HasPrefix(vault_file, "-") {
+						fmt.Println("Invalid value for vault file location.")
+						os.Exit(1)
+					}
+				}
+			} else {
+				// The first non-option argument is encountered
+				foundFirstArg = true
+				cmd = arg
+			}
+		} else {
+			// Handle arguments after the first argument
+			arguments = append(arguments, arg)
+		}
+
+		i++ // Increment the loop variable
+	}
+
+	return cmd, arguments
+}
+
+func readVaultLocation() (string, error) {
+	// Open the file for reading
+	file, err := os.Open(".vault")
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	// Create a bufio scanner to read lines from the file
+	scanner := bufio.NewScanner(file)
+
+	// Check if there is at least one line in the file
+	if scanner.Scan() {
+		// Read the first line
+		firstLine := scanner.Text()
+		return firstLine, nil
+	} else if err := scanner.Err(); err != nil {
+		return "", err
+	}
+
+	return "", fmt.Errorf("The file is empty")
+}
 
 var execCmd = &cobra.Command{
 	Use:   "exec",
@@ -61,14 +124,17 @@ var execCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		v := vault.NewVault(vault_file, []byte(masterPwd))
+		cmdToRun, cmdArgs := processArgs(args)
 
-		// Extract the command and arguments
-		cmdToRun := args[0]
-		cmdArgs := []string{}
-		if len(args) > 1 {
-			cmdArgs = args[1:]
+		if vault_file == "" {
+			vault_file, _ = readVaultLocation()
 		}
+
+		if vault_file == "" {
+			vault_file = "repository.vault"
+		}
+
+		v := vault.NewVault(vault_file, []byte(masterPwd))
 
 		cmdExec := exec.Command(cmdToRun, cmdArgs...)
 		stdoutPipe, _ := cmdExec.StdoutPipe()
@@ -150,5 +216,5 @@ var execCmd = &cobra.Command{
 
 func init() {
 	cmd.RootCmd.AddCommand(execCmd)
-	execCmd.Flags().StringVarP(&vault_file, "vault", "v", "repository.vault", "Dry Run")
+	execCmd.DisableFlagParsing = true
 }
