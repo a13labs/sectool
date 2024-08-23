@@ -160,3 +160,8 @@ Contributions to `sectool` are welcome! If you find any issues or have suggestio
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Thanks to the Go community for providing the tools and resources to build this project.
+- Special mention to the developers of libraries and tools used in this project.
