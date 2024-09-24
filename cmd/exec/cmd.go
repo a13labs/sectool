@@ -35,6 +35,7 @@ import (
 )
 
 var vault_file = ""
+var no_output = false
 
 var execCmd = &cobra.Command{
 	Use:   "exec",
@@ -67,6 +68,11 @@ var execCmd = &cobra.Command{
 		cmdExec := exec.Command(cmdToRun, cmdArgs...)
 		stdoutPipe, _ := cmdExec.StdoutPipe()
 		stderrPipe, _ := cmdExec.StderrPipe()
+		if no_output {
+			cmdExec.Stdout = nil
+			cmdExec.Stderr = nil
+		}
+
 		cmdExec.Env = append(os.Environ(), "SECTOOL_ENV=1")
 		sensitiveStrings := []string{masterPwd}
 
@@ -78,22 +84,23 @@ var execCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// Create goroutines to read and hide output from stdout and stderr
-		go func() {
-			scanner := bufio.NewScanner(stdoutPipe)
-			for scanner.Scan() {
-				line := scanner.Text()
-				fmt.Println(HideSensitiveInfo(line, sensitiveStrings))
-			}
-		}()
+		if no_output {
+			go func() {
+				scanner := bufio.NewScanner(stdoutPipe)
+				for scanner.Scan() {
+					line := scanner.Text()
+					fmt.Println(HideSensitiveInfo(line, sensitiveStrings))
+				}
+			}()
 
-		go func() {
-			scanner := bufio.NewScanner(stderrPipe)
-			for scanner.Scan() {
-				line := scanner.Text()
-				fmt.Println(HideSensitiveInfo(line, sensitiveStrings))
-			}
-		}()
+			go func() {
+				scanner := bufio.NewScanner(stderrPipe)
+				for scanner.Scan() {
+					line := scanner.Text()
+					fmt.Println(HideSensitiveInfo(line, sensitiveStrings))
+				}
+			}()
+		}
 
 		err := cmdExec.Wait()
 		if err != nil {
@@ -147,6 +154,9 @@ func ProcessArgs(args []string) (string, []string) {
 						fmt.Println("Invalid value for vault file location.")
 						os.Exit(1)
 					}
+				}
+				if arg == "--no-output" || arg == "-n" {
+					no_output = true
 				}
 			} else {
 				// The first non-option argument is encountered
