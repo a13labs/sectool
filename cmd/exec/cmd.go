@@ -84,7 +84,7 @@ var execCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		if no_output {
+		if !no_output {
 			go func() {
 				scanner := bufio.NewScanner(stdoutPipe)
 				for scanner.Scan() {
