@@ -46,7 +46,7 @@ var execCmd = &cobra.Command{
 			fmt.Println("Usage: sectool exec <cmd> <args>")
 			os.Exit(0)
 		}
-		masterPwd, exist := os.LookupEnv("VAULT_MASTER_PASSWORD")
+		_, exist := os.LookupEnv("VAULT_MASTER_PASSWORD")
 		if !exist {
 			fmt.Println("VAULT_MASTER_PASSWORD it's not defined, aborting.")
 			os.Exit(1)
@@ -66,25 +66,16 @@ var execCmd = &cobra.Command{
 		}
 
 		cmdExec := exec.Command(cmdToRun, cmdArgs...)
-		stdoutPipe, _ := cmdExec.StdoutPipe()
-		stderrPipe, _ := cmdExec.StderrPipe()
-		if no_output {
-			cmdExec.Stdout = nil
-			cmdExec.Stderr = nil
-		}
 
 		cmdExec.Env = append(os.Environ(), "SECTOOL_ENV=1")
-		sensitiveStrings := []string{masterPwd}
+		sensitiveStrings := GetSensitiveStrings("sectool.env")
 
-		// Append the environment variables from the env file
-		cmdExec.Env = append(cmdExec.Env, ComposeEnv("sectool.env")...)
+		if no_output {
+			fmt.Println("Command started.")
+		} else {
+			stdoutPipe, _ := cmdExec.StdoutPipe()
+			stderrPipe, _ := cmdExec.StderrPipe()
 
-		if err := cmdExec.Start(); err != nil {
-			fmt.Printf("Error starting command: %v\n", err)
-			os.Exit(1)
-		}
-
-		if !no_output {
 			go func() {
 				scanner := bufio.NewScanner(stdoutPipe)
 				for scanner.Scan() {
@@ -100,6 +91,14 @@ var execCmd = &cobra.Command{
 					fmt.Println(HideSensitiveInfo(line, sensitiveStrings))
 				}
 			}()
+		}
+
+		// Append the environment variables from the env file
+		cmdExec.Env = append(cmdExec.Env, ComposeEnv("sectool.env")...)
+
+		if err := cmdExec.Start(); err != nil {
+			fmt.Printf("Error starting command: %v\n", err)
+			os.Exit(1)
 		}
 
 		err := cmdExec.Wait()
@@ -254,4 +253,61 @@ func ComposeEnv(envFile string) []string {
 
 	// Return the environment slice
 	return env
+}
+
+func GetSensitiveStrings(envFile string) []string {
+
+	// Read the contents of the file
+	contents, err := os.ReadFile(envFile)
+	if err != nil {
+		fmt.Printf("Error reading file: %v\n", err)
+		os.Exit(1)
+	}
+
+	masterPwd, _ := os.LookupEnv("VAULT_MASTER_PASSWORD")
+	v := vault.NewVault(vault_file, []byte(masterPwd))
+
+	sensitiveStrings := []string{masterPwd}
+
+	// Split the contents of the file into lines
+	lines := strings.Split(string(contents), "\n")
+
+	// Compile the regular expression pattern
+	regex := regexp.MustCompile(pattern)
+	lineNr := 0
+
+	// Iterate over the lines in the file
+	for _, line := range lines {
+		// Split the line into key and value
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		// Find all matches in the input string
+		matches := regex.FindAllStringSubmatch(parts[1], -1)
+		result := parts[1]
+
+		// Iterate over the matches
+		for _, match := range matches {
+
+			// Extract the key name
+			keyName := match[1]
+
+			// Get the value from the vault
+			keyValue, err := v.VaultGetValue(keyName)
+			if err != nil {
+				fmt.Printf("Error getting value '%s' on line %d: %v\n", keyName, lineNr, err)
+				os.Exit(1)
+			}
+
+			// Replace the key with the value
+			result = strings.Replace(result, fmt.Sprintf("$%s", keyName), keyValue, -1)
+		}
+
+		sensitiveStrings = append(sensitiveStrings, result)
+	}
+
+	return sensitiveStrings
+
 }
