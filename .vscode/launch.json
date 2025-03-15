@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Vault",
+            "type": "go",
+            "request": "launch",
+            "mode": "exec",
+            "program": "${workspaceFolder}/build/sectool-debug",
+            "args": [
+                "vault",
+                "list"
+            ],
+            "env": {
+                "FILE_VAULT_KEY": "DEMOKEY"
+            },
+            "preLaunchTask": "Run make debug"
+        }
+    ]
+}

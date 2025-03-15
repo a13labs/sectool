@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/a13labs/sectool/internal/config"
 	"github.com/a13labs/sectool/internal/vault"
 	"github.com/spf13/cobra"
 )
@@ -32,21 +33,21 @@ import (
 // listCmd represents the list command
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "List keys in the vault.",
+	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		master_pwd, exist := os.LookupEnv("VAULT_MASTER_PASSWORD")
-		if !exist {
-			fmt.Println("VAULT_MASTER_PASSWORD it's not defined, aborting.")
+		cfg, err := config.ReadConfig(config_file)
+		if err != nil {
+			fmt.Printf("Error reading config file: %v\n", err)
 			os.Exit(1)
 		}
-		v := vault.NewVault("repository.vault", []byte(master_pwd))
-		keys := v.VaultListKeys()
+
+		vaultProvider, err := vault.NewVaultProvider(*cfg)
+		if err != nil {
+			fmt.Println("Error initializing vault provider.")
+			os.Exit(1)
+		}
+		keys := vaultProvider.VaultListKeys()
 		for _, key := range keys {
 			fmt.Println(key)
 		}

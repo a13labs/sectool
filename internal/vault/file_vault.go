@@ -1,4 +1,3 @@
-// vault.go
 package vault
 
 import (
@@ -8,36 +7,61 @@ import (
 	"strings"
 	"time"
 
+	"github.com/a13labs/sectool/internal/config"
 	"github.com/a13labs/sectool/internal/crypto"
 )
 
-// Vault represents a secure key-value store.
-type Vault struct {
-	filePath string
-	key      []byte
-	backup   bool
+// FileVault represents a secure key-value store.
+type FileVault struct {
+	VaultProvider
+	path   string
+	key    []byte
+	backup bool
 }
 
-// NewVault creates a new Vault instance.
-func NewVault(filePath string, key []byte) *Vault {
-	return &Vault{
-		filePath: filePath,
-		key:      key,
-		backup:   false,
+// NewVault creates a new FileVault instance.
+func NewFileVault(config *config.FileConfig) (*FileVault, error) {
+
+	if config == nil {
+		fmt.Println("File configuration is nil")
+		return nil, errors.New("file configuration is nil")
 	}
+
+	key := config.Key
+	if key == "" {
+		key, _ = os.LookupEnv("FILE_VAULT_KEY")
+		if key == "" {
+			fmt.Println("FILE_VAULT_KEY it's not defined, aborting.")
+			return nil, errors.New("file vault key is not defined")
+		}
+	}
+
+	path := config.Path
+	if path == "" {
+		path, _ := os.LookupEnv("FILE_VAULT_PATH")
+		if path == "" {
+			path = "repository.vault"
+		}
+	}
+
+	return &FileVault{
+		path:   path,
+		key:    []byte(key),
+		backup: false,
+	}, nil
 }
 
 // readVault reads the vault file contents.
-func (v *Vault) readVault() (string, error) {
+func (v *FileVault) readVault() (string, error) {
 	if !v.vaultFileExists() {
-		f, err := os.Create(v.filePath)
+		f, err := os.Create(v.path)
 		if err != nil {
 			return "", errors.New("vault file does not exist")
 		}
 		f.Close()
 	}
 
-	decryptedContents, err := crypto.DecryptFromFile(v.filePath, v.key)
+	decryptedContents, err := crypto.DecryptFromFile(v.path, v.key)
 	if err != nil {
 		return "", err
 	}
@@ -46,7 +70,7 @@ func (v *Vault) readVault() (string, error) {
 }
 
 // writeVault writes encrypted data to the vault file.
-func (v *Vault) writeVault(contents string) error {
+func (v *FileVault) writeVault(contents string) error {
 
 	if v.backup {
 		// Create a backup of the existing vault
@@ -58,7 +82,7 @@ func (v *Vault) writeVault(contents string) error {
 	}
 
 	// Encrypt the data and write to the vault file
-	err := crypto.EncryptToFile(contents, v.filePath, v.key, false)
+	err := crypto.EncryptToFile(contents, v.path, v.key, false)
 	if err != nil {
 		return err
 	}
@@ -67,8 +91,8 @@ func (v *Vault) writeVault(contents string) error {
 }
 
 // backupVault creates a backup of the vault file.
-func (v *Vault) backupVault(backupName string) error {
-	contents, err := os.ReadFile(v.filePath)
+func (v *FileVault) backupVault(backupName string) error {
+	contents, err := os.ReadFile(v.path)
 	if err != nil {
 		return err
 	}
@@ -82,25 +106,25 @@ func (v *Vault) backupVault(backupName string) error {
 }
 
 // vaultBackupName generates a backup filename with a timestamp.
-func (v *Vault) vaultBackupName() string {
+func (v *FileVault) vaultBackupName() string {
 	timestamp := time.Now().Format("20060102150405")
-	return fmt.Sprintf("%s_%s", v.filePath, timestamp)
+	return fmt.Sprintf("%s_%s", v.path, timestamp)
 }
 
 // vaultFileExists checks if the vault file exists.
-func (v *Vault) vaultFileExists() bool {
-	_, err := os.Stat(v.filePath)
+func (v *FileVault) vaultFileExists() bool {
+	_, err := os.Stat(v.path)
 	return !os.IsNotExist(err)
 }
 
 // Initialize creates a new vault file if it doesn't exist.
-func (v *Vault) Initialize() error {
+func (v *FileVault) Initialize() error {
 	if v.vaultFileExists() {
 		return nil
 	}
 
 	// Create an empty vault file
-	err := os.WriteFile(v.filePath, []byte(""), 0600)
+	err := os.WriteFile(v.path, []byte(""), 0600)
 	if err != nil {
 		return err
 	}
@@ -109,7 +133,7 @@ func (v *Vault) Initialize() error {
 }
 
 // VaultHasKey checks if the vault contains the specified key.
-func (v *Vault) VaultHasKey(key string) bool {
+func (v *FileVault) VaultHasKey(key string) bool {
 	contents, err := v.readVault()
 	if err != nil {
 		return false
@@ -127,7 +151,7 @@ func (v *Vault) VaultHasKey(key string) bool {
 }
 
 // VaultGetValue returns the value of a key from the vault.
-func (v *Vault) VaultGetValue(key string) (string, error) {
+func (v *FileVault) VaultGetValue(key string) (string, error) {
 	contents, err := v.readVault()
 	if err != nil {
 		return "", err
@@ -145,7 +169,7 @@ func (v *Vault) VaultGetValue(key string) (string, error) {
 }
 
 // VaultListKeys lists all keys in the vault.
-func (v *Vault) VaultListKeys() []string {
+func (v *FileVault) VaultListKeys() []string {
 	contents, err := v.readVault()
 	if err != nil {
 		return []string{}
@@ -164,7 +188,7 @@ func (v *Vault) VaultListKeys() []string {
 }
 
 // VaultSetValue sets the value of a key in the vault.
-func (v *Vault) VaultSetValue(key, value string) error {
+func (v *FileVault) VaultSetValue(key, value string) error {
 	contents, err := v.readVault()
 	if err != nil {
 		return err
@@ -188,7 +212,7 @@ func (v *Vault) VaultSetValue(key, value string) error {
 }
 
 // VaultDelKey deletes a key from the vault.
-func (v *Vault) VaultDelKey(key string) error {
+func (v *FileVault) VaultDelKey(key string) error {
 	contents, err := v.readVault()
 	if err != nil {
 		return err
@@ -214,6 +238,48 @@ func (v *Vault) VaultDelKey(key string) error {
 	return v.writeVault(updatedContents)
 }
 
-func (v *Vault) VaultEnableBackup(value bool) {
+func (v *FileVault) VaultEnableBackup(value bool) {
 	v.backup = value
+}
+
+func (v *FileVault) GetSensitiveStrings() []string {
+	return []string{string(v.key)}
+}
+
+func (v *FileVault) Lock() error {
+
+	unlocked_vault := v.path + ".unlocked"
+	locked_vault := v.path
+
+	_, err := os.Stat(unlocked_vault)
+	if os.IsNotExist(err) {
+		return nil
+	}
+
+	err = crypto.EncryptFile(unlocked_vault, locked_vault, []byte(v.key))
+	if err != nil {
+		return err
+	}
+
+	os.Remove(unlocked_vault)
+
+	return nil
+}
+
+func (v *FileVault) Unlock() error {
+
+	unlocked_vault := v.path + ".unlocked"
+	locked_vault := v.path
+
+	_, err := os.Stat(locked_vault)
+	if os.IsNotExist(err) {
+		return nil
+	}
+
+	err = crypto.DecryptFile(locked_vault, unlocked_vault, []byte(v.key))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -138,20 +138,53 @@ sectool exec -- terraform apply --auto-approve
 
 **Note**: All sensitive data will not be visible from the application output.
 
-### Vault location
+## Vaults
 
-When running the `exec`command, if not specified, the vault file needs to be located at the same folder of `sectool.env`, to override the location you can either use `-v`flag or `.vault`file.
+This tool for now support 2 vault providers
+- File Value (default if not specified)
+- Bitwarden Secrets Manager
 
-```bash
-sectool -v <vault_location> -- <commmand>
+The vault can be configured using a config file, the file will be read in the following order.
+- specified using `-f` or `--config` flag
+- `SECTOOL_CONFIG_FILE` environment variable
+
+### File Vault
+
+Config example:
+```json
+{
+    "provider": "file",
+    "file": {
+        "key": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+        "path": "repository.vault",
+    }
+}
 ```
+Arguments:
+- `key`: encryption key (this value can also be read from the environment `FILE_VAULT_KEY`)
+- `path`: path to the vault (this value can also be read from the environment `FILE_VAULT_PATH`)
 
-Using **.vault** file to point the vault to the parent folder.
+### Bitwarden Secrets Manager Vault
+
+Config example:
+```json
+{
+    "provider": "bitwarden",
+    "bitwarden": {
+        "api_url": "https://api.bitwarden.eu",
+        "identity_url": "https://identity.bitwarden.eu",
+        "project": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+        "organization": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+        "access_token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+}
 ```
-../repository.vault
-````
-
-**Note**: currently it is only supported to load from the local filesystem.
+Arguments:
+- `api_url`: Bitwarden API URL (this value can also be read from the environment `BW_API_URL`)
+- `identity_url`: Bitwarden identity URL (this value can also be read from the environment `BW_IDENTITY_URL`)
+- `project`: Bitwarden project UUID (this value can also be read from the environment `BW_PROJECT_ID`)
+- `organization`: Bitwarden organization UUID (this value can also be read from the environment `BW_ORGANIZATION_ID`)
+- `access_token`: Bitwarden access token (this value can also be read from the environment `BW_ACCESS_TOKEN`)
 
 ## Contributing
 

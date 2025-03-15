@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/a13labs/sectool/internal/config"
 	"github.com/a13labs/sectool/internal/crypto"
 	"github.com/a13labs/sectool/internal/ssh"
 	"github.com/a13labs/sectool/internal/vault"
@@ -38,16 +39,28 @@ var unlockCmd = &cobra.Command{
 	Short: "A Unlock SSH key pairs",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		master_pwd, exist := os.LookupEnv("VAULT_MASTER_PASSWORD")
-		if !exist {
-			fmt.Println("VAULT_MASTER_PASSWORD it's not defined. Aborting")
-			os.Exit(1)
-		}
 
 		_, err := os.Stat("ssh-keys")
 		if os.IsNotExist(err) {
 			fmt.Println("Missing keys directory, no keys can be listed.")
 			os.Exit(1)
+		}
+
+		cfg, err := config.ReadConfig(config_file)
+		if err != nil {
+			fmt.Printf("Error reading config file: %v\n", err)
+			os.Exit(1)
+		}
+
+		vaultProvider, err := vault.NewVaultProvider(*cfg)
+		if err != nil {
+			fmt.Println("Error initializing vault provider.")
+			os.Exit(1)
+		}
+
+		key := cfg.SSHPasswordKey
+		if key == "" {
+			key = defaultSSHPasswordKey
 		}
 
 		keys, err := listKeys("ssh-keys")
@@ -56,10 +69,9 @@ var unlockCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		v := vault.NewVault("repository.vault", []byte(master_pwd))
-		ssh_master_password, err := v.VaultGetValue("SSH_MASTER_PASSWORD")
+		ssh_master_password, err := vaultProvider.VaultGetValue(key)
 		if err != nil {
-			fmt.Println("Error reading SSH_MASTER_PASSWORD, aborting.")
+			fmt.Printf("Error reading '%s', aborting.", key)
 			os.Exit(1)
 		}
 

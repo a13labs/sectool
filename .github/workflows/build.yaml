@@ -24,7 +24,7 @@ jobs:
 
       - name: Build for Linux
         run: |
-          go build -o sectool main.go
+          go build -ldflags="-extldflags=-lm" -o sectool main.go
           zip sectool-linux-x64.zip sectool
         env:
           GOOS: linux
@@ -40,7 +40,7 @@ jobs:
 
       - name: Build for macOS (Intel)
         run: |
-          go build -o sectool main.go
+          go build -ldflags="-extldflags=-lm" -o sectool main.go
           zip sectool-darwin-x64.zip sectool
         env:
           GOOS: darwin
@@ -48,7 +48,7 @@ jobs:
 
       - name: Build for macOS (Apple Silicon)
         run: |
-          go build -o sectool main.go
+          go build -ldflags="-extldflags=-lm" -o sectool main.go
           zip sectool-darwin-arm64.zip sectool
         env:
           GOOS: darwin

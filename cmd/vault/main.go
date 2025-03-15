@@ -33,6 +33,9 @@ var vaultCmd = &cobra.Command{
 	Long:  `Manage your local vault`,
 }
 
+var config_file = ""
+
 func init() {
 	cmd.RootCmd.AddCommand(vaultCmd)
+	vaultCmd.PersistentFlags().StringVarP(&config_file, "config", "f", "", "Configuration file")
 }

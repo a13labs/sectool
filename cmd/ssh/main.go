@@ -33,6 +33,11 @@ var sshCmd = &cobra.Command{
 	Long:  ``,
 }
 
+var config_file = ""
+
+const defaultSSHPasswordKey = "SSH_MASTER_PASSWORD"
+
 func init() {
 	cmd.RootCmd.AddCommand(sshCmd)
+	sshCmd.PersistentFlags().StringVarP(&config_file, "config", "f", "", "Configuration file")
 }

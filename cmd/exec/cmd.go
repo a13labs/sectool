@@ -30,12 +30,15 @@ import (
 	"strings"
 
 	"github.com/a13labs/sectool/cmd"
+	"github.com/a13labs/sectool/internal/config"
 	"github.com/a13labs/sectool/internal/vault"
 	"github.com/spf13/cobra"
 )
 
-var vault_file = ""
+var config_file = ""
 var no_output = false
+var cfg *config.Config
+var vaultProvider vault.VaultProvider
 
 var execCmd = &cobra.Command{
 	Use:   "exec",
@@ -46,27 +49,23 @@ var execCmd = &cobra.Command{
 			fmt.Println("Usage: sectool exec <cmd> <args>")
 			os.Exit(0)
 		}
-		_, exist := os.LookupEnv("VAULT_MASTER_PASSWORD")
-		if !exist {
-			fmt.Println("VAULT_MASTER_PASSWORD it's not defined, aborting.")
+
+		cmdToRun, cmdArgs := ProcessArgs(args)
+
+		var err error
+		cfg, err = config.ReadConfig(config_file)
+		if err != nil {
+			fmt.Printf("Error reading config file: %v\n", err)
 			os.Exit(1)
 		}
 
-		// Process the arguments
-		cmdToRun, cmdArgs := ProcessArgs(args)
-
-		// If the vault file is not provided, try to read it from the .vault file
-		if vault_file == "" {
-			vault_file, _ = ReadVaultLocation()
-		}
-
-		// If the vault file is still not provided, use the default value
-		if vault_file == "" {
-			vault_file = "repository.vault"
+		vaultProvider, err = vault.NewVaultProvider(*cfg)
+		if err != nil {
+			fmt.Println("Error initializing vault provider.")
+			os.Exit(1)
 		}
 
 		cmdExec := exec.Command(cmdToRun, cmdArgs...)
-
 		cmdExec.Env = append(os.Environ(), "SECTOOL_ENV=1")
 		sensitiveStrings := GetSensitiveStrings("sectool.env")
 
@@ -101,7 +100,7 @@ var execCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		err := cmdExec.Wait()
+		err = cmdExec.Wait()
 		if err != nil {
 			exitError := err.(*exec.ExitError)
 			exitCode := exitError.ExitCode()
@@ -142,14 +141,14 @@ func ProcessArgs(args []string) (string, []string) {
 
 		if !foundFirstArg {
 			if strings.HasPrefix(arg, "--") || strings.HasPrefix(arg, "-") {
-				if arg == "--vault" || arg == "-v" {
+				if arg == "--config" || arg == "-f" {
 					i++
 					if i == len(args) {
 						fmt.Println("Missing vault file location.")
 						os.Exit(1)
 					}
-					vault_file = args[i]
-					if strings.HasPrefix(vault_file, "--") || strings.HasPrefix(vault_file, "-") {
+					config_file = args[i]
+					if strings.HasPrefix(config_file, "--") || strings.HasPrefix(config_file, "-") {
 						fmt.Println("Invalid value for vault file location.")
 						os.Exit(1)
 					}
@@ -173,25 +172,6 @@ func ProcessArgs(args []string) (string, []string) {
 	return cmd, arguments
 }
 
-// ReadVaultLocation reads the location of the vault file from the .vault file
-func ReadVaultLocation() (string, error) {
-	// Open the file for reading
-	file, err := os.Open(".vault")
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-
-	// Create a bufio scanner to read lines from the file
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		// Read the next line
-		line := scanner.Text()
-		return line, nil
-	}
-	return "", fmt.Errorf("the file is empty")
-}
-
 // ComposeEnv reads the environment variables from the file and replaces the keys with the values from the vault
 func ComposeEnv(envFile string) []string {
 
@@ -202,8 +182,10 @@ func ComposeEnv(envFile string) []string {
 		os.Exit(1)
 	}
 
-	masterPwd, _ := os.LookupEnv("VAULT_MASTER_PASSWORD")
-	v := vault.NewVault(vault_file, []byte(masterPwd))
+	if err != nil {
+		fmt.Println("Error initializing vault provider.")
+		os.Exit(1)
+	}
 
 	// Split the contents of the file into lines
 	lines := strings.Split(string(contents), "\n")
@@ -237,7 +219,7 @@ func ComposeEnv(envFile string) []string {
 			keyName := match[1]
 
 			// Get the value from the vault
-			keyValue, err := v.VaultGetValue(keyName)
+			keyValue, err := vaultProvider.VaultGetValue(keyName)
 			if err != nil {
 				fmt.Printf("Error getting value '%s' on line %d: %v\n", keyName, lineNr, err)
 				os.Exit(1)
@@ -264,10 +246,10 @@ func GetSensitiveStrings(envFile string) []string {
 		os.Exit(1)
 	}
 
-	masterPwd, _ := os.LookupEnv("VAULT_MASTER_PASSWORD")
-	v := vault.NewVault(vault_file, []byte(masterPwd))
+	sensitiveStrings := []string{}
 
-	sensitiveStrings := []string{masterPwd}
+	// append vault sensitive strings
+	sensitiveStrings = append(sensitiveStrings, vaultProvider.GetSensitiveStrings()...)
 
 	// Split the contents of the file into lines
 	lines := strings.Split(string(contents), "\n")
@@ -295,7 +277,7 @@ func GetSensitiveStrings(envFile string) []string {
 			keyName := match[1]
 
 			// Get the value from the vault
-			keyValue, err := v.VaultGetValue(keyName)
+			keyValue, err := vaultProvider.VaultGetValue(keyName)
 			if err != nil {
 				fmt.Printf("Error getting value '%s' on line %d: %v\n", keyName, lineNr, err)
 				os.Exit(1)
@@ -309,5 +291,4 @@ func GetSensitiveStrings(envFile string) []string {
 	}
 
 	return sensitiveStrings
-
 }

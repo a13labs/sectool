@@ -4,12 +4,20 @@ import (
 	"errors"
 	"os"
 	"testing"
+
+	"github.com/a13labs/sectool/internal/config"
 )
 
-func TestVault(t *testing.T) {
-	key := []byte("mysecretkey")
+func TestFileVault(t *testing.T) {
+
 	vault_path := "testdata/repository.vault"
-	vault := NewVault(vault_path, key)
+	vault, err := NewFileVault(&config.FileConfig{
+		Path: vault_path,
+		Key:  "mysecretkey",
+	})
+	if err != nil {
+		t.Error(err)
+	}
 
 	defer func() {
 		_ = os.Remove(vault_path)

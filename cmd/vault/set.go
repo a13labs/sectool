@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/a13labs/sectool/internal/config"
 	"github.com/a13labs/sectool/internal/vault"
 	"github.com/spf13/cobra"
 )
@@ -32,26 +33,28 @@ import (
 // setCmd represents the set command
 var setCmd = &cobra.Command{
 	Use:   "set",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Set a key/value in the vault",
+	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) < 2 {
 			fmt.Println("Missing key and value.")
 			os.Exit(1)
 		}
-		master_pwd, exist := os.LookupEnv("VAULT_MASTER_PASSWORD")
-		if !exist {
-			fmt.Println("VAULT_MASTER_PASSWORD it's not defined, aborting")
+
+		cfg, err := config.ReadConfig(config_file)
+		if err != nil {
+			fmt.Printf("Error reading config file: %v\n", err)
 			os.Exit(1)
 		}
-		v := vault.NewVault("repository.vault", []byte(master_pwd))
-		v.VaultEnableBackup(cmd.Flag("backup").Value.String() == "true")
-		err := v.VaultSetValue(args[0], args[1])
+
+		vaultProvider, err := vault.NewVaultProvider(*cfg)
+		if err != nil {
+			fmt.Println("Error initializing vault provider.")
+			os.Exit(1)
+		}
+
+		vaultProvider.VaultEnableBackup(cmd.Flag("backup").Value.String() == "true")
+		err = vaultProvider.VaultSetValue(args[0], args[1])
 		if err != nil {
 			fmt.Println("Error setting key/value.")
 			os.Exit(1)

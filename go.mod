@@ -1,6 +1,8 @@
 module github.com/a13labs/sectool
 
-go 1.20
+go 1.21
+
+toolchain go1.22.0
 
 require (
 	github.com/spf13/cobra v1.7.0
@@ -10,7 +12,9 @@ require (
 )
 
 require (
+	github.com/bitwarden/sdk-go v1.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect

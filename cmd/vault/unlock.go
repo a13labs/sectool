@@ -25,36 +25,34 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/a13labs/sectool/internal/crypto"
+	"github.com/a13labs/sectool/internal/config"
+	"github.com/a13labs/sectool/internal/vault"
 	"github.com/spf13/cobra"
 )
 
 var unlockCmd = &cobra.Command{
 	Use:   "unlock",
-	Short: "Unlock vault",
+	Short: "If the provider supports it, unlock the vault.",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		master_pwd, exist := os.LookupEnv("VAULT_MASTER_PASSWORD")
-		if !exist {
-			fmt.Println("VAULT_MASTER_PASSWORD it's not defined, aborting.")
+
+		cfg, err := config.ReadConfig(config_file)
+		if err != nil {
+			fmt.Printf("Error reading config file: %v\n", err)
 			os.Exit(1)
 		}
 
-		unlocked_vault := "repository.vault.unlocked"
-		locked_vault := "repository.vault"
-
-		_, err := os.Stat(locked_vault)
-		if os.IsNotExist(err) {
-			fmt.Println("Vault does not exists, nothing to be unlocked.")
+		vaultProvider, err := vault.NewVaultProvider(*cfg)
+		if err != nil {
+			fmt.Println("Error initializing vault provider.")
 			os.Exit(1)
 		}
 
-		err = crypto.DecryptFile(locked_vault, unlocked_vault, []byte(master_pwd))
+		err = vaultProvider.Unlock()
 		if err != nil {
 			fmt.Println("Error unlocking vault.")
 			os.Exit(1)
 		}
-		os.Exit(0)
 	},
 }
 

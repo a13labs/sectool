@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/a13labs/sectool/internal/config"
 	"github.com/a13labs/sectool/internal/vault"
 	"github.com/spf13/cobra"
 )
@@ -39,13 +40,20 @@ var delCmd = &cobra.Command{
 			fmt.Println("Missing key.")
 			os.Exit(1)
 		}
-		master_pwd, exist := os.LookupEnv("VAULT_MASTER_PASSWORD")
-		if !exist {
-			fmt.Println("VAULT_MASTER_PASSWORD it's not defined, aborting.")
+
+		cfg, err := config.ReadConfig(config_file)
+		if err != nil {
+			fmt.Printf("Error reading config file: %v\n", err)
 			os.Exit(1)
 		}
-		v := vault.NewVault("repository.vault", []byte(master_pwd))
-		err := v.VaultDelKey(args[0])
+
+		vaultProvider, err := vault.NewVaultProvider(*cfg)
+		if err != nil {
+			fmt.Println("Error initializing vault provider.")
+			os.Exit(1)
+		}
+
+		err = vaultProvider.VaultDelKey(args[0])
 		if err != nil {
 			fmt.Println("Error deleting key/value.")
 			os.Exit(1)
