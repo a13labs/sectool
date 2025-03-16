@@ -11,8 +11,12 @@
                 "vault",
                 "list"
             ],
+            "cwd": "${workspaceFolder}/build",
             "env": {
-                "FILE_VAULT_KEY": "DEMOKEY"
+                "BW_ACCESS_TOKEN": "your_token",
+                "BW_ORGANIZATION_ID": "your_org_id",
+                "BW_PROJECT_ID": "your_project_id",
+                "FILE_VAULT_KEY": "your_vault_key",
             },
             "preLaunchTask": "Run make debug"
         }

@@ -15,6 +15,7 @@ type VaultProvider interface {
 	VaultHasKey(key string) bool
 	VaultEnableBackup(value bool)
 	GetSensitiveStrings() []string
+	VaultGetMultipleValues(keys []string) (map[string]string, error)
 	Lock() error
 	Unlock() error
 }

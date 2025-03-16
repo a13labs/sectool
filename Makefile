@@ -24,6 +24,7 @@ build-mac-arm:
 
 test:
 	$(GOTEST) -ldflags="-extldflags=-lm" -v ./internal/...
+	$(GOTEST) -ldflags="-extldflags=-lm" -v ./cmd/...
 
 debug:
 	$(GOBUILD) -ldflags="-extldflags=-lm" -o $(BUILD_DIR)/$(BINARY_NAME)-debug -gcflags="all=-N -l" -v .

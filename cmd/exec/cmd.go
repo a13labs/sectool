@@ -38,7 +38,6 @@ import (
 var config_file = ""
 var no_output = false
 var cfg *config.Config
-var vaultProvider vault.VaultProvider
 
 var execCmd = &cobra.Command{
 	Use:   "exec",
@@ -59,7 +58,7 @@ var execCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		vaultProvider, err = vault.NewVaultProvider(*cfg)
+		vaultProvider, err := vault.NewVaultProvider(*cfg)
 		if err != nil {
 			fmt.Println("Error initializing vault provider.")
 			os.Exit(1)
@@ -67,8 +66,11 @@ var execCmd = &cobra.Command{
 
 		cmdExec := exec.Command(cmdToRun, cmdArgs...)
 		cmdExec.Env = append(os.Environ(), "SECTOOL_ENV=1")
-		sensitiveStrings := GetSensitiveStrings("sectool.env")
-
+		envMap, vaultValues, sensitiveStrings, err := ParseEnvFile("sectool.env", vaultProvider)
+		if err != nil {
+			fmt.Printf("Error parsing env file: %v\n", err)
+			os.Exit(1)
+		}
 		if no_output {
 			fmt.Println("Command started.")
 		} else {
@@ -93,7 +95,12 @@ var execCmd = &cobra.Command{
 		}
 
 		// Append the environment variables from the env file
-		cmdExec.Env = append(cmdExec.Env, ComposeEnv("sectool.env")...)
+		envVars, err := ComposeEnv(envMap, vaultValues)
+		if err != nil {
+			fmt.Printf("Error composing environment variables: %v\n", err)
+			os.Exit(1)
+		}
+		cmdExec.Env = append(cmdExec.Env, envVars...)
 
 		if err := cmdExec.Start(); err != nil {
 			fmt.Printf("Error starting command: %v\n", err)
@@ -172,123 +179,102 @@ func ProcessArgs(args []string) (string, []string) {
 	return cmd, arguments
 }
 
-// ComposeEnv reads the environment variables from the file and replaces the keys with the values from the vault
-func ComposeEnv(envFile string) []string {
-
+func ParseEnvFile(envFile string, v vault.VaultProvider) (map[string]string, map[string]string, []string, error) {
 	// Read the contents of the file
 	contents, err := os.ReadFile(envFile)
 	if err != nil {
 		fmt.Printf("Error reading file: %v\n", err)
-		os.Exit(1)
-	}
-
-	if err != nil {
-		fmt.Println("Error initializing vault provider.")
-		os.Exit(1)
+		return nil, nil, nil, err
 	}
 
 	// Split the contents of the file into lines
 	lines := strings.Split(string(contents), "\n")
 
-	// Create a new slice to store the environment variables
-	env := make([]string, 0)
+	// Create a new map to store the environment variables
+	env := make(map[string]string)
 
-	// Compile the regular expression pattern
-	regex := regexp.MustCompile(pattern)
 	lineNr := 0
-
 	// Iterate over the lines in the file
 	for _, line := range lines {
+		lineNr++
+		// skip empty lines and comments
+		if len(line) == 0 || strings.HasPrefix(line, "#") {
+			continue
+		}
+
 		// Split the line into key and value
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
-			continue
+			return nil, nil, nil, fmt.Errorf("invalid line %d: %s", lineNr, line)
 		}
 
 		// Extract the environment variable name
 		envName := parts[0]
+		envValue := parts[1]
 
-		// Find all matches in the input string
-		matches := regex.FindAllStringSubmatch(parts[1], -1)
-		result := parts[1]
-
-		// Iterate over the matches
-		for _, match := range matches {
-
-			// Extract the key name
-			keyName := match[1]
-
-			// Get the value from the vault
-			keyValue, err := vaultProvider.VaultGetValue(keyName)
-			if err != nil {
-				fmt.Printf("Error getting value '%s' on line %d: %v\n", keyName, lineNr, err)
-				os.Exit(1)
-			}
-
-			// Replace the key with the value
-			result = strings.Replace(result, fmt.Sprintf("$%s", keyName), keyValue, -1)
-		}
-
-		// Append the environment variable to the slice
-		env = append(env, fmt.Sprintf("%s=%s", envName, result))
+		env[envName] = envValue
 	}
 
-	// Return the environment slice
-	return env
-}
-
-func GetSensitiveStrings(envFile string) []string {
-
-	// Read the contents of the file
-	contents, err := os.ReadFile(envFile)
-	if err != nil {
-		fmt.Printf("Error reading file: %v\n", err)
-		os.Exit(1)
-	}
-
+	// Extract the sensitive strings from the environment variables
+	usedKeys := []string{}
 	sensitiveStrings := []string{}
+	sensitiveValues := []string{}
 
-	// append vault sensitive strings
-	sensitiveStrings = append(sensitiveStrings, vaultProvider.GetSensitiveStrings()...)
-
-	// Split the contents of the file into lines
-	lines := strings.Split(string(contents), "\n")
-
-	// Compile the regular expression pattern
 	regex := regexp.MustCompile(pattern)
-	lineNr := 0
+	for _, value := range env {
 
-	// Iterate over the lines in the file
-	for _, line := range lines {
-		// Split the line into key and value
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
+		matches := regex.FindAllStringSubmatch(value, -1)
+		if len(matches) == 0 {
+			sensitiveValues = append(sensitiveValues, value)
 			continue
 		}
 
-		// Find all matches in the input string
-		matches := regex.FindAllStringSubmatch(parts[1], -1)
-		result := parts[1]
-
 		// Iterate over the matches
 		for _, match := range matches {
-
-			// Extract the key name
 			keyName := match[1]
-
-			// Get the value from the vault
-			keyValue, err := vaultProvider.VaultGetValue(keyName)
-			if err != nil {
-				fmt.Printf("Error getting value '%s' on line %d: %v\n", keyName, lineNr, err)
-				os.Exit(1)
-			}
-
-			// Replace the key with the value
-			result = strings.Replace(result, fmt.Sprintf("$%s", keyName), keyValue, -1)
+			usedKeys = append(usedKeys, keyName)
 		}
-
-		sensitiveStrings = append(sensitiveStrings, result)
 	}
 
-	return sensitiveStrings
+	vaultValues, err := v.VaultGetMultipleValues(usedKeys)
+	if err != nil {
+		fmt.Printf("Error getting multiple values from vault: %v\n", err)
+		return nil, nil, nil, err
+	}
+
+	for _, value := range vaultValues {
+		sensitiveStrings = append(sensitiveStrings, value)
+	}
+
+	sensitiveStrings = append(sensitiveStrings, sensitiveValues...)
+
+	// Return the environment map
+	return env, vaultValues, sensitiveStrings, nil
+}
+
+// ComposeEnv reads the environment variables from the file and replaces the keys with the values from the vault
+func ComposeEnv(e map[string]string, vaultValues map[string]string) ([]string, error) {
+
+	// Create a new slice to store the environment variables
+	env := []string{}
+
+	// Extract the sensitive strings from the environment variables
+	regex := regexp.MustCompile(pattern)
+	for key, value := range e {
+
+		composedValue := value
+		matches := regex.FindAllStringSubmatch(value, -1)
+		if len(matches) > 0 {
+			// Iterate over the matches
+			for _, match := range matches {
+				secretKey := match[1]
+				composedValue = strings.Replace(composedValue, "$"+secretKey, vaultValues[secretKey], -1)
+			}
+		}
+
+		env = append(env, fmt.Sprintf("%s=%s", key, composedValue))
+	}
+
+	// Return the environment slice
+	return env, nil
 }

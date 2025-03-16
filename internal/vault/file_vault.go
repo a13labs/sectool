@@ -238,14 +238,17 @@ func (v *FileVault) VaultDelKey(key string) error {
 	return v.writeVault(updatedContents)
 }
 
+// VaultEnableBackup enables or disables vault backups.
 func (v *FileVault) VaultEnableBackup(value bool) {
 	v.backup = value
 }
 
+// GetSensitiveStrings returns the sensitive strings in the vault.
 func (v *FileVault) GetSensitiveStrings() []string {
 	return []string{string(v.key)}
 }
 
+// Lock encrypts the vault file.
 func (v *FileVault) Lock() error {
 
 	unlocked_vault := v.path + ".unlocked"
@@ -266,6 +269,7 @@ func (v *FileVault) Lock() error {
 	return nil
 }
 
+// Unlock decrypts the vault file.
 func (v *FileVault) Unlock() error {
 
 	unlocked_vault := v.path + ".unlocked"
@@ -282,4 +286,27 @@ func (v *FileVault) Unlock() error {
 	}
 
 	return nil
+}
+
+// VaultGetMultipleValues returns the values of multiple keys from the vault.
+func (v *FileVault) VaultGetMultipleValues(keys []string) (map[string]string, error) {
+	contents, err := v.readVault()
+	if err != nil {
+		return nil, err
+	}
+
+	values := make(map[string]string)
+	lines := strings.Split(contents, "\n")
+	for _, line := range lines {
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			for _, key := range keys {
+				if parts[0] == key {
+					values[key] = parts[1]
+				}
+			}
+		}
+	}
+
+	return values, nil
 }
