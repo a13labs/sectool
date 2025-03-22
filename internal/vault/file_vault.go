@@ -244,8 +244,8 @@ func (v *FileVault) VaultEnableBackup(value bool) {
 }
 
 // GetSensitiveStrings returns the sensitive strings in the vault.
-func (v *FileVault) GetSensitiveStrings() []string {
-	return []string{string(v.key)}
+func (v *FileVault) SetSensitiveStrings(kv *crypto.SecureKVStore) {
+	kv.Put("SECTOOL_FV_SENSITIVE_1", string(v.key))
 }
 
 // Lock encrypts the vault file.
@@ -289,24 +289,23 @@ func (v *FileVault) Unlock() error {
 }
 
 // VaultGetMultipleValues returns the values of multiple keys from the vault.
-func (v *FileVault) VaultGetMultipleValues(keys []string) (map[string]string, error) {
+func (v *FileVault) VaultGetMultipleValues(keys []string, kv *crypto.SecureKVStore) error {
 	contents, err := v.readVault()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	values := make(map[string]string)
 	lines := strings.Split(contents, "\n")
 	for _, line := range lines {
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) == 2 {
 			for _, key := range keys {
 				if parts[0] == key {
-					values[key] = parts[1]
+					kv.Put(parts[0], parts[1])
 				}
 			}
 		}
 	}
 
-	return values, nil
+	return nil
 }

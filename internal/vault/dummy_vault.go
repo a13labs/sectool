@@ -3,6 +3,8 @@ package vault
 import (
 	"errors"
 	"sync"
+
+	"github.com/a13labs/sectool/internal/crypto"
 )
 
 type DummyVault struct {
@@ -75,8 +77,7 @@ func (v *DummyVault) VaultEnableBackup(value bool) {
 	v.backup = value
 }
 
-func (v *DummyVault) GetSensitiveStrings() []string {
-	return []string{}
+func (v *DummyVault) SetSensitiveStrings(kv *crypto.SecureKVStore) {
 }
 
 func (v *DummyVault) Lock() error {
@@ -87,14 +88,17 @@ func (v *DummyVault) Unlock() error {
 	return nil
 }
 
-func (v *DummyVault) VaultGetMultipleValues(keys []string) (map[string]string, error) {
+func (v *DummyVault) VaultGetMultipleValues(keys []string, kv *crypto.SecureKVStore) error {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
-	values := make(map[string]string)
+
 	for _, key := range keys {
 		if value, exists := v.data[key]; exists {
-			values[key] = value
+			err := kv.Put(key, value)
+			if err != nil {
+				return err
+			}
 		}
 	}
-	return values, nil
+	return nil
 }

@@ -2,6 +2,8 @@ package vault
 
 import (
 	"testing"
+
+	"github.com/a13labs/sectool/internal/crypto"
 )
 
 func TestNewDummyVault(t *testing.T) {
@@ -103,14 +105,19 @@ func TestDummyVault_VaultGetMultipleValues(t *testing.T) {
 	vault.VaultSetValue("key1", "value1")
 	vault.VaultSetValue("key2", "value2")
 	keys := []string{"key1", "key2", "key3"}
-	values, err := vault.VaultGetMultipleValues(keys)
+	km := crypto.NewKeyManager()
+	kv := crypto.NewSecureKVStore(km)
+	err := vault.VaultGetMultipleValues(keys, kv)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
-	if len(values) != 2 {
-		t.Fatalf("Expected 2 values, got %d", len(values))
+	if kv.Len() != 2 {
+		t.Fatalf("Expected 2 values, got %d", kv.Len())
 	}
-	if values["key1"] != "value1" || values["key2"] != "value2" {
-		t.Fatal("Expected correct values for keys")
+	if value, err := kv.Get("key1"); err != nil || value != "value1" {
+		t.Fatalf("Expected value 'value1', got %v", value)
+	}
+	if value, err := kv.Get("key2"); err != nil || value != "value2" {
+		t.Fatalf("Expected value 'value2', got %v", value)
 	}
 }

@@ -31,6 +31,7 @@ import (
 
 	"github.com/a13labs/sectool/cmd"
 	"github.com/a13labs/sectool/internal/config"
+	sectoolCrypto "github.com/a13labs/sectool/internal/crypto"
 	"github.com/a13labs/sectool/internal/vault"
 	"github.com/spf13/cobra"
 )
@@ -43,7 +44,7 @@ var execCmd = &cobra.Command{
 	Use:   "exec",
 	Short: "Execute a command",
 	Long:  `Execute a command with the environment variables from the .env file and the vault file.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(c *cobra.Command, args []string) {
 		if len(args) == 0 {
 			fmt.Println("Usage: sectool exec <cmd> <args>")
 			os.Exit(0)
@@ -52,7 +53,7 @@ var execCmd = &cobra.Command{
 		cmdToRun, cmdArgs := ProcessArgs(args)
 
 		var err error
-		cfg, err = config.ReadConfig(config_file)
+		cfg, err = config.ReadConfig(cmd.ConfigFile)
 		if err != nil {
 			fmt.Printf("Error reading config file: %v\n", err)
 			os.Exit(1)
@@ -64,9 +65,10 @@ var execCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		km := sectoolCrypto.NewKeyManager()
 		cmdExec := exec.Command(cmdToRun, cmdArgs...)
 		cmdExec.Env = append(os.Environ(), "SECTOOL_ENV=1")
-		envMap, vaultValues, sensitiveStrings, err := ParseEnvFile("sectool.env", vaultProvider)
+		envMap, kv, err := ParseEnvFile("sectool.env", vaultProvider, km)
 		if err != nil {
 			fmt.Printf("Error parsing env file: %v\n", err)
 			os.Exit(1)
@@ -81,7 +83,7 @@ var execCmd = &cobra.Command{
 				scanner := bufio.NewScanner(stdoutPipe)
 				for scanner.Scan() {
 					line := scanner.Text()
-					fmt.Println(HideSensitiveInfo(line, sensitiveStrings))
+					fmt.Println(HideSensitiveInfo(line, kv))
 				}
 			}()
 
@@ -89,13 +91,13 @@ var execCmd = &cobra.Command{
 				scanner := bufio.NewScanner(stderrPipe)
 				for scanner.Scan() {
 					line := scanner.Text()
-					fmt.Println(HideSensitiveInfo(line, sensitiveStrings))
+					fmt.Println(HideSensitiveInfo(line, kv))
 				}
 			}()
 		}
 
 		// Append the environment variables from the env file
-		envVars, err := ComposeEnv(envMap, vaultValues)
+		envVars, err := ComposeEnv(envMap, kv)
 		if err != nil {
 			fmt.Printf("Error composing environment variables: %v\n", err)
 			os.Exit(1)
@@ -124,10 +126,11 @@ func init() {
 }
 
 // HideSensitiveInfo replaces sensitive strings with a placeholder
-func HideSensitiveInfo(input string, sensitiveStrings []string) string {
+func HideSensitiveInfo(input string, kv *sectoolCrypto.SecureKVStore) string {
 	result := input
-	for _, s := range sensitiveStrings {
-		result = strings.Replace(result, s, "[HIDDEN]", -1)
+	for _, key := range kv.ListKeys() {
+		sensitiveValue, _ := kv.Get(key)
+		result = strings.Replace(result, sensitiveValue, "[HIDDEN]", -1)
 	}
 	return result
 }
@@ -139,7 +142,7 @@ const pattern = `\s*\$([a-zA-Z_][a-zA-Z0-9_]*)`
 func ProcessArgs(args []string) (string, []string) {
 
 	var arguments []string
-	cmd := ""
+	executionCommand := ""
 	foundFirstArg := false
 
 	i := 0 // Initialize a loop variable
@@ -151,10 +154,10 @@ func ProcessArgs(args []string) (string, []string) {
 				if arg == "--config" || arg == "-f" {
 					i++
 					if i == len(args) {
-						fmt.Println("Missing vault file location.")
+						fmt.Println("Missing config file location.")
 						os.Exit(1)
 					}
-					config_file = args[i]
+					cmd.ConfigFile = args[i]
 					if strings.HasPrefix(config_file, "--") || strings.HasPrefix(config_file, "-") {
 						fmt.Println("Invalid value for vault file location.")
 						os.Exit(1)
@@ -166,7 +169,7 @@ func ProcessArgs(args []string) (string, []string) {
 			} else {
 				// The first non-option argument is encountered
 				foundFirstArg = true
-				cmd = arg
+				executionCommand = arg
 			}
 		} else {
 			// Handle arguments after the first argument
@@ -176,15 +179,15 @@ func ProcessArgs(args []string) (string, []string) {
 		i++ // Increment the loop variable
 	}
 
-	return cmd, arguments
+	return executionCommand, arguments
 }
 
-func ParseEnvFile(envFile string, v vault.VaultProvider) (map[string]string, map[string]string, []string, error) {
+func ParseEnvFile(envFile string, v vault.VaultProvider, km *sectoolCrypto.KeyManager) (map[string]string, *sectoolCrypto.SecureKVStore, error) {
 	// Read the contents of the file
 	contents, err := os.ReadFile(envFile)
 	if err != nil {
 		fmt.Printf("Error reading file: %v\n", err)
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	// Split the contents of the file into lines
@@ -205,7 +208,7 @@ func ParseEnvFile(envFile string, v vault.VaultProvider) (map[string]string, map
 		// Split the line into key and value
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
-			return nil, nil, nil, fmt.Errorf("invalid line %d: %s", lineNr, line)
+			return nil, nil, fmt.Errorf("invalid line %d: %s", lineNr, line)
 		}
 
 		// Extract the environment variable name
@@ -217,15 +220,18 @@ func ParseEnvFile(envFile string, v vault.VaultProvider) (map[string]string, map
 
 	// Extract the sensitive strings from the environment variables
 	usedKeys := []string{}
-	sensitiveStrings := []string{}
-	sensitiveValues := []string{}
+	kv := sectoolCrypto.NewSecureKVStore(km)
 
 	regex := regexp.MustCompile(pattern)
 	for _, value := range env {
 
 		matches := regex.FindAllStringSubmatch(value, -1)
 		if len(matches) == 0 {
-			sensitiveValues = append(sensitiveValues, value)
+			err := kv.Put("SECTOOL_SENSITIVE_VALUE_"+value, value)
+			if err != nil {
+				fmt.Printf("Error putting value in vault: %v\n", err)
+				return nil, nil, err
+			}
 			continue
 		}
 
@@ -236,24 +242,18 @@ func ParseEnvFile(envFile string, v vault.VaultProvider) (map[string]string, map
 		}
 	}
 
-	vaultValues, err := v.VaultGetMultipleValues(usedKeys)
+	err = v.VaultGetMultipleValues(usedKeys, kv)
 	if err != nil {
 		fmt.Printf("Error getting multiple values from vault: %v\n", err)
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
-
-	for _, value := range vaultValues {
-		sensitiveStrings = append(sensitiveStrings, value)
-	}
-
-	sensitiveStrings = append(sensitiveStrings, sensitiveValues...)
 
 	// Return the environment map
-	return env, vaultValues, sensitiveStrings, nil
+	return env, kv, nil
 }
 
 // ComposeEnv reads the environment variables from the file and replaces the keys with the values from the vault
-func ComposeEnv(e map[string]string, vaultValues map[string]string) ([]string, error) {
+func ComposeEnv(e map[string]string, kv *sectoolCrypto.SecureKVStore) ([]string, error) {
 
 	// Create a new slice to store the environment variables
 	env := []string{}
@@ -268,7 +268,11 @@ func ComposeEnv(e map[string]string, vaultValues map[string]string) ([]string, e
 			// Iterate over the matches
 			for _, match := range matches {
 				secretKey := match[1]
-				composedValue = strings.Replace(composedValue, "$"+secretKey, vaultValues[secretKey], -1)
+				secretValue, err := kv.Get(secretKey)
+				if err != nil {
+					return nil, fmt.Errorf("error getting value from vault: %v", err)
+				}
+				composedValue = strings.Replace(composedValue, "$"+secretKey, secretValue, -1)
 			}
 		}
 

@@ -27,14 +27,17 @@ import (
 	"testing"
 
 	"github.com/a13labs/sectool/cmd/exec"
+	"github.com/a13labs/sectool/internal/crypto"
 	"github.com/a13labs/sectool/internal/vault"
 )
 
 func TestHideSensitiveInfo(t *testing.T) {
 	input := "This is a secret: $SECRET_KEY$"
-	sensitiveStrings := []string{"$SECRET_KEY$"}
+	km := crypto.NewKeyManager()
+	kv := crypto.NewSecureKVStore(km)
+	kv.Put("SECRET", "$SECRET_KEY$")
 	expected := "This is a secret: [HIDDEN]"
-	output := exec.HideSensitiveInfo(input, sensitiveStrings)
+	output := exec.HideSensitiveInfo(input, kv)
 	if output != expected {
 		t.Errorf("Expected %q, but got %q", expected, output)
 	}
@@ -60,6 +63,7 @@ func TestProcessArgs(t *testing.T) {
 
 func TestParseEnvFile(t *testing.T) {
 	envFile := "test.env"
+	km := crypto.NewKeyManager()
 	vaultProvider := vault.NewDummyVault()
 	vaultProvider.VaultSetValue("SECRET1", "secret_value1")
 	vaultProvider.VaultSetValue("SECRET2", "secret_value2")
@@ -70,7 +74,7 @@ func TestParseEnvFile(t *testing.T) {
 		"SECRET_VAR2":     "$SECRET2",
 		"COMPOSED_SECRET": "$SECRET1.$SECRET2",
 	}
-	env, _, _, err := exec.ParseEnvFile(envFile, vaultProvider)
+	env, _, err := exec.ParseEnvFile(envFile, vaultProvider, km)
 	if err != nil {
 		t.Errorf("Error parsing env file: %v", err)
 	}
@@ -84,43 +88,18 @@ func TestParseEnvFile(t *testing.T) {
 	}
 }
 
-func TestGetSensitiveStrings(t *testing.T) {
-
-	envFile := "test.env"
-	vaultProvider := vault.NewDummyVault()
-	vaultProvider.VaultSetValue("SECRET1", "secret_value1")
-	vaultProvider.VaultSetValue("SECRET2", "secret_value2")
-	expectedSensitiveStrings := []string{"value1", "value2", "secret_value1", "secret_value2"}
-	_, _, sensitiveStrings, err := exec.ParseEnvFile(envFile, vaultProvider)
-	if err != nil {
-		t.Errorf("Error parsing env file: %v", err)
-	}
-	sort.Strings(sensitiveStrings)
-	sort.Strings(expectedSensitiveStrings)
-	if err != nil {
-		t.Errorf("Error getting sensitive strings: %v", err)
-	}
-	if len(sensitiveStrings) != len(expectedSensitiveStrings) {
-		t.Errorf("Expected %d sensitive strings, but got %d", len(expectedSensitiveStrings), len(sensitiveStrings))
-	}
-	for i := range sensitiveStrings {
-		if sensitiveStrings[i] != expectedSensitiveStrings[i] {
-			t.Errorf("Expected sensitiveStrings[%d] %q, but got %q", i, expectedSensitiveStrings[i], sensitiveStrings[i])
-		}
-	}
-}
-
 func TestComposeEnv(t *testing.T) {
 	envFile := "test.env"
+	km := crypto.NewKeyManager()
 	vaultProvider := vault.NewDummyVault()
 	vaultProvider.VaultSetValue("SECRET1", "secret_value1")
 	vaultProvider.VaultSetValue("SECRET2", "secret_value2")
 	expectedEnv := []string{"ENV_VAR1=value1", "ENV_VAR2=value2", "SECRET_VAR1=secret_value1", "SECRET_VAR2=secret_value2", "COMPOSED_SECRET=secret_value1.secret_value2"}
-	env, vaultValues, _, err := exec.ParseEnvFile(envFile, vaultProvider)
+	env, kv, err := exec.ParseEnvFile(envFile, vaultProvider, km)
 	if err != nil {
 		t.Errorf("Error parsing env file: %v", err)
 	}
-	composedEnv, err := exec.ComposeEnv(env, vaultValues)
+	composedEnv, err := exec.ComposeEnv(env, kv)
 	sort.Strings(expectedEnv)
 	sort.Strings(composedEnv)
 	if err != nil {

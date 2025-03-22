@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/a13labs/sectool/cmd"
 	"github.com/a13labs/sectool/internal/config"
 	"github.com/a13labs/sectool/internal/crypto"
 	"github.com/a13labs/sectool/internal/ssh"
@@ -38,7 +39,7 @@ var unlockCmd = &cobra.Command{
 	Use:   "unlock",
 	Short: "A Unlock SSH key pairs",
 	Long:  ``,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(c *cobra.Command, args []string) {
 
 		_, err := os.Stat("ssh-keys")
 		if os.IsNotExist(err) {
@@ -46,7 +47,7 @@ var unlockCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		cfg, err := config.ReadConfig(config_file)
+		cfg, err := config.ReadConfig(cmd.ConfigFile)
 		if err != nil {
 			fmt.Printf("Error reading config file: %v\n", err)
 			os.Exit(1)

@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/a13labs/sectool/cmd"
 	"github.com/a13labs/sectool/internal/config"
 	"github.com/a13labs/sectool/internal/vault"
 	"github.com/spf13/cobra"
@@ -35,13 +36,13 @@ var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Init SSH key pairs management",
 	Long:  ``,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(c *cobra.Command, args []string) {
 		if len(args) < 1 {
 			fmt.Println("Missing password.")
 			os.Exit(1)
 		}
 
-		cfg, err := config.ReadConfig(config_file)
+		cfg, err := config.ReadConfig(cmd.ConfigFile)
 		if err != nil {
 			fmt.Printf("Error reading config file: %v\n", err)
 			os.Exit(1)

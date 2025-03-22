@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/a13labs/sectool/internal/config"
+	"github.com/a13labs/sectool/internal/crypto"
 	"github.com/bitwarden/sdk-go"
 )
 
@@ -278,8 +279,10 @@ func (v *BitwardenVault) VaultEnableBackup(value bool) {
 }
 
 // GetSensitiveStrings returns sensitive strings from the Bitwarden vault.
-func (v *BitwardenVault) GetSensitiveStrings() []string {
-	return []string{v.accessToken, v.organizationId, v.projectId}
+func (v *BitwardenVault) SetSensitiveStrings(kv *crypto.SecureKVStore) {
+	kv.Put("SECTOOL_BW_SENSITIVE_1", v.accessToken)
+	kv.Put("SECTOOL_BW_SENSITIVE_2", v.organizationId)
+	kv.Put("SECTOOL_BW_SENSITIVE_3", v.projectId)
 }
 
 func (v *BitwardenVault) Lock() error {
@@ -291,24 +294,24 @@ func (v *BitwardenVault) Unlock() error {
 }
 
 // VaultGetMultipleValues returns multiple values from the Bitwarden vault.
-func (v *BitwardenVault) VaultGetMultipleValues(keys []string) (map[string]string, error) {
+func (v *BitwardenVault) VaultGetMultipleValues(keys []string, kv *crypto.SecureKVStore) error {
 
 	client, err := sdk.NewBitwardenClient(&v.apiURL, &v.identityURL)
 	if err != nil {
 		log.Printf("Error creating Bitwarden client: %v", err)
-		return nil, err
+		return err
 	}
 	defer client.Close()
 
 	err = client.AccessTokenLogin(v.accessToken, nil)
 	if err != nil {
 		log.Printf("Error logging in with access token: %v", err)
-		return nil, err
+		return err
 	}
 
 	secretIdentifiers, err := client.Secrets().List(v.organizationId)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Get secrets with a list of IDs that belong to the specified project
@@ -330,7 +333,6 @@ func (v *BitwardenVault) VaultGetMultipleValues(keys []string) (map[string]strin
 		secretKeysMap[identifier.Key] = secret.ID
 	}
 
-	values := make(map[string]string)
 	for _, key := range keys {
 
 		id, ok := secretKeysMap[key]
@@ -347,8 +349,8 @@ func (v *BitwardenVault) VaultGetMultipleValues(keys []string) (map[string]strin
 			continue
 		}
 
-		values[key] = secret.Value
+		kv.Put(key, secret.Value)
 	}
 
-	return values, nil
+	return nil
 }

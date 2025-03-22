@@ -11,16 +11,18 @@ import (
 type ProviderType string
 
 const (
-	FileProvider      ProviderType = "file"
-	BitwardenProvider ProviderType = "bitwarden"
+	FileProvider          ProviderType = "file"
+	BitwardenProvider     ProviderType = "bitwarden"
+	ObjectStorageProvider ProviderType = "object_storage"
 )
 
 // Config represents the configuration structure
 type Config struct {
-	Provider       ProviderType     `json:"provider"`
-	FileVault      *FileConfig      `json:"file,omitempty"`
-	BitwardenVault *BitwardenConfig `json:"bitwarden,omitempty"`
-	SSHPasswordKey string           `json:"ssh_password_key,omitempty"`
+	Provider           ProviderType         `json:"provider"`
+	FileVault          *FileConfig          `json:"file,omitempty"`
+	BitwardenVault     *BitwardenConfig     `json:"bitwarden,omitempty"`
+	ObjectStorageVault *ObjectStorageConfig `json:"object_storage,omitempty"`
+	SSHPasswordKey     string               `json:"ssh_password_key,omitempty"`
 }
 
 // FileConfig represents the configuration for the file provider
@@ -36,6 +38,14 @@ type BitwardenConfig struct {
 	AccessToken    string `json:"access_token,omitempty"`
 	OrganizationId string `json:"organization,omitempty"`
 	ProjectId      string `json:"project,omitempty"`
+}
+
+type ObjectStorageConfig struct {
+	Region   string `json:"region"`
+	Endpoint string `json:"endpoint"`
+	Bucket   string `json:"bucket"`
+	Key      string `json:"key"`
+	Backup   bool   `json:"backup"`
 }
 
 var (

@@ -10,6 +10,119 @@ import (
 	"os"
 )
 
+// DecryptFromReader decrypts data read from an io.Reader.
+func DecryptFromReader(reader io.Reader, key []byte) (string, error) {
+	// Create a new SHA-256 hash of the key
+	hash := sha256.Sum256(key)
+
+	// Read the encrypted data from the reader
+	encryptedData, err := io.ReadAll(reader)
+	if err != nil {
+		return "", err
+	}
+
+	// Decode the base64-encoded data
+	decodedData, err := base64.StdEncoding.DecodeString(string(encryptedData))
+	if err != nil {
+		return "", err
+	}
+
+	// Extract nonce and cipherText from the decoded data
+	nonce := decodedData[:12]
+	cipherText := decodedData[12:]
+
+	// Create a new AES cipher block using the hashed key
+	block, err := aes.NewCipher(hash[:])
+	if err != nil {
+		return "", err
+	}
+
+	// Create a new GCM cipher instance
+	aesGCM, err := cipher.NewGCMWithNonceSize(block, 12)
+	if err != nil {
+		return "", err
+	}
+
+	// Decrypt the cipherText using AES-GCM and nonce
+	plainText, err := aesGCM.Open(nil, nonce, cipherText, nil)
+	if err != nil {
+		return "", err
+	}
+
+	return string(plainText), nil
+}
+
+// EncryptFromReader encrypts data read from an io.Reader.
+func EncryptFromReader(reader io.Reader, key []byte) (string, error) {
+	// Create a new SHA-256 hash of the key
+	hash := sha256.Sum256(key)
+
+	// Read the plain data from the reader
+	plainData, err := io.ReadAll(reader)
+	if err != nil {
+		return "", err
+	}
+
+	// Create a new AES cipher block using the hashed key
+	block, err := aes.NewCipher(hash[:])
+	if err != nil {
+		return "", err
+	}
+
+	// Generate a random nonce
+	nonce := make([]byte, 12)
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", err
+	}
+
+	// Create a new GCM cipher instance
+	aesGCM, err := cipher.NewGCMWithNonceSize(block, 12)
+	if err != nil {
+		return "", err
+	}
+
+	// Encrypt the plain data using AES-GCM
+	cipherText := aesGCM.Seal(nil, nonce, plainData, nil)
+
+	// Combine nonce and cipherText and base64 encode the result
+	encryptedData := append(nonce, cipherText...)
+	encodedData := base64.StdEncoding.EncodeToString(encryptedData)
+
+	return encodedData, nil
+}
+
+func EncryptToBytes(input string, key []byte) ([]byte, error) {
+	// Create a new SHA-256 hash of the key
+	hash := sha256.Sum256(key)
+
+	// Create a new AES cipher block using the hashed key
+	block, err := aes.NewCipher(hash[:])
+	if err != nil {
+		return nil, err
+	}
+
+	// Generate a random nonce
+	nonce := make([]byte, 12)
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+
+	// Create a new GCM cipher instance
+	aesGCM, err := cipher.NewGCMWithNonceSize(block, 12)
+	if err != nil {
+		return nil, err
+	}
+
+	// Encrypt the input using AES-GCM
+	cipherText := aesGCM.Seal(nil, nonce, []byte(input), nil)
+
+	// Combine nonce and cipherText and base64 encode the result
+	encryptedData := append(nonce, cipherText...)
+	encodedData := base64.StdEncoding.EncodeToString(encryptedData)
+
+	return []byte(encodedData), nil
+}
+
 func Encrypt(input string, key []byte) (string, error) {
 	// Create a new SHA-256 hash of the key
 	hash := sha256.Sum256(key)

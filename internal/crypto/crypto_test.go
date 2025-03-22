@@ -3,8 +3,138 @@ package crypto
 import (
 	"io"
 	"os"
+	"strings"
 	"testing"
 )
+
+func TestEncryptToBytes(t *testing.T) {
+	key := []byte("mysecretkey")
+	input := "Hello, this is a test message!"
+
+	// Test EncryptToBytes
+	encryptedBytes, err := EncryptToBytes(input, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Decrypt the encrypted bytes and compare with the original content
+	decrypted, err := Decrypt(string(encryptedBytes), key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if decrypted != input {
+		t.Errorf("Expected decrypted data to be '%s', but got '%s'", input, decrypted)
+	}
+}
+
+func TestDecryptFromReader(t *testing.T) {
+	key := []byte("mysecretkey")
+	input := "Hello, this is a test message!"
+
+	// Encrypt the input
+	encrypted, err := Encrypt(input, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a reader for the encrypted data
+	reader := io.NopCloser(strings.NewReader(encrypted))
+
+	// Test DecryptFromReader
+	decrypted, err := DecryptFromReader(reader, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if decrypted != input {
+		t.Errorf("Expected decrypted data to be '%s', but got '%s'", input, decrypted)
+	}
+}
+
+func TestEncryptFromReader(t *testing.T) {
+	key := []byte("mysecretkey")
+	input := "Hello, this is a test message!"
+
+	// Create a reader for the input data
+	reader := io.NopCloser(strings.NewReader(input))
+
+	// Test EncryptFromReader
+	encrypted, err := EncryptFromReader(reader, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Decrypt the encrypted data and compare with the original content
+	decrypted, err := Decrypt(encrypted, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if decrypted != input {
+		t.Errorf("Expected decrypted data to be '%s', but got '%s'", input, decrypted)
+	}
+}
+
+func TestEncryptAndDecryptEmptyInput(t *testing.T) {
+	key := []byte("mysecretkey")
+	input := ""
+
+	// Test Encrypt and Decrypt with empty input
+	encrypted, err := Encrypt(input, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	decrypted, err := Decrypt(encrypted, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if decrypted != input {
+		t.Errorf("Expected decrypted data to be '%s', but got '%s'", input, decrypted)
+	}
+}
+
+func TestEncryptFileWithEmptyInput(t *testing.T) {
+	key := []byte("mysecretkey")
+	sourceFilePath := "testdata/empty.txt"
+	encryptedFilePath := "testdata/encrypted_empty.txt"
+	decryptedFilePath := "testdata/decrypted_empty.txt"
+
+	// Create an empty source file
+	err := os.WriteFile(sourceFilePath, []byte(""), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = os.Remove(sourceFilePath)
+		_ = os.Remove(encryptedFilePath)
+		_ = os.Remove(decryptedFilePath)
+	}()
+
+	// Test EncryptFile with empty input
+	err = EncryptFile(sourceFilePath, encryptedFilePath, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test DecryptFile with empty input
+	err = DecryptFile(encryptedFilePath, decryptedFilePath, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify the decrypted file is empty
+	decryptedData, err := os.ReadFile(decryptedFilePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(decryptedData) != 0 {
+		t.Errorf("Expected decrypted file to be empty, but got '%s'", string(decryptedData))
+	}
+}
 
 func TestEncryptAndDecrypt(t *testing.T) {
 	key := []byte("mysecretkey")

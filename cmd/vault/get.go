@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/a13labs/sectool/cmd"
 	"github.com/a13labs/sectool/internal/config"
 	"github.com/a13labs/sectool/internal/vault"
 	"github.com/spf13/cobra"
@@ -37,13 +38,13 @@ var getCmd = &cobra.Command{
 	Use:   "get",
 	Short: "Get a key/value from the vault.",
 	Long:  ``,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(c *cobra.Command, args []string) {
 		if len(args) < 1 {
 			fmt.Println("Usage: sectool vault get <key>")
 			os.Exit(1)
 		}
 
-		cfg, err := config.ReadConfig(config_file)
+		cfg, err := config.ReadConfig(cmd.ConfigFile)
 		if err != nil {
 			fmt.Printf("Error reading config file: %v\n", err)
 			os.Exit(1)

@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/a13labs/sectool/cmd"
 	"github.com/a13labs/sectool/internal/config"
 	"github.com/a13labs/sectool/internal/vault"
 	"github.com/spf13/cobra"
@@ -35,13 +36,13 @@ var setCmd = &cobra.Command{
 	Use:   "set",
 	Short: "Set a key/value in the vault",
 	Long:  ``,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(c *cobra.Command, args []string) {
 		if len(args) < 2 {
 			fmt.Println("Missing key and value.")
 			os.Exit(1)
 		}
 
-		cfg, err := config.ReadConfig(config_file)
+		cfg, err := config.ReadConfig(cmd.ConfigFile)
 		if err != nil {
 			fmt.Printf("Error reading config file: %v\n", err)
 			os.Exit(1)
@@ -53,7 +54,7 @@ var setCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		vaultProvider.VaultEnableBackup(cmd.Flag("backup").Value.String() == "true")
+		vaultProvider.VaultEnableBackup(c.Flag("backup").Value.String() == "true")
 		err = vaultProvider.VaultSetValue(args[0], args[1])
 		if err != nil {
 			fmt.Println("Error setting key/value.")

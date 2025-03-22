@@ -43,3 +43,9 @@ func Execute() {
 		os.Exit(1)
 	}
 }
+
+var ConfigFile string
+
+func init() {
+	RootCmd.PersistentFlags().StringVarP(&ConfigFile, "config", "f", "", "Configuration file")
+}
