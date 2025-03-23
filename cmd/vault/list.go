@@ -26,8 +26,7 @@ import (
 	"os"
 
 	"github.com/a13labs/sectool/cmd"
-	"github.com/a13labs/sectool/internal/config"
-	"github.com/a13labs/sectool/internal/vault"
+	"github.com/a13labs/sectool/vault"
 	"github.com/spf13/cobra"
 )
 
@@ -37,18 +36,12 @@ var listCmd = &cobra.Command{
 	Short: "List keys in the vault.",
 	Long:  ``,
 	Run: func(c *cobra.Command, args []string) {
-		cfg, err := config.ReadConfig(cmd.ConfigFile)
-		if err != nil {
-			fmt.Printf("Error reading config file: %v\n", err)
-			os.Exit(1)
-		}
 
-		vaultProvider, err := vault.NewVaultProvider(*cfg)
+		keys, err := vault.ListSecrets(cmd.ConfigFile)
 		if err != nil {
-			fmt.Println("Error initializing vault provider.")
+			fmt.Println("Error listing keys.")
 			os.Exit(1)
 		}
-		keys := vaultProvider.VaultListKeys()
 		for _, key := range keys {
 			fmt.Println(key)
 		}

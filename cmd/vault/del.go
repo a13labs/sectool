@@ -26,8 +26,7 @@ import (
 	"os"
 
 	"github.com/a13labs/sectool/cmd"
-	"github.com/a13labs/sectool/internal/config"
-	"github.com/a13labs/sectool/internal/vault"
+	"github.com/a13labs/sectool/vault"
 	"github.com/spf13/cobra"
 )
 
@@ -42,23 +41,12 @@ var delCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		cfg, err := config.ReadConfig(cmd.ConfigFile)
-		if err != nil {
-			fmt.Printf("Error reading config file: %v\n", err)
-			os.Exit(1)
-		}
-
-		vaultProvider, err := vault.NewVaultProvider(*cfg)
-		if err != nil {
-			fmt.Println("Error initializing vault provider.")
-			os.Exit(1)
-		}
-
-		err = vaultProvider.VaultDelKey(args[0])
+		err := vault.DeleteSecret(cmd.ConfigFile, args[0])
 		if err != nil {
 			fmt.Println("Error deleting key/value.")
 			os.Exit(1)
 		}
+
 		fmt.Println("Key/value deleted")
 		os.Exit(0)
 	},
