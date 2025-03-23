@@ -124,7 +124,7 @@ func SetSecret(path string, key string, value string, backup bool) error {
 		}
 		key = string(v)
 	}
-	err = vaultProvider.VaultSetValue(key, key)
+	err = vaultProvider.VaultSetValue(key, value)
 	if err != nil {
 		fmt.Println("Error setting key/value.")
 		return err
