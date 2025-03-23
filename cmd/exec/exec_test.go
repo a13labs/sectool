@@ -23,6 +23,7 @@ package exec_test
 
 import (
 	"fmt"
+	osExec "os/exec"
 	"sort"
 	"testing"
 
@@ -67,12 +68,14 @@ func TestParseEnvFile(t *testing.T) {
 	vaultProvider := vault.NewDummyVault()
 	vaultProvider.VaultSetValue("SECRET1", "secret_value1")
 	vaultProvider.VaultSetValue("SECRET2", "secret_value2")
+	vaultProvider.VaultSetValue("SECRET3", "This is a\nmultiline secret")
 	expectedEnv := map[string]string{
-		"ENV_VAR1":        "value1",
-		"ENV_VAR2":        "value2",
-		"SECRET_VAR1":     "$SECRET1",
-		"SECRET_VAR2":     "$SECRET2",
-		"COMPOSED_SECRET": "$SECRET1.$SECRET2",
+		"ENV_VAR1":         "value1",
+		"ENV_VAR2":         "value2",
+		"SECRET_VAR1":      "$SECRET1",
+		"SECRET_VAR2":      "$SECRET2",
+		"COMPOSED_SECRET":  "$SECRET1.$SECRET2",
+		"MULTILINE_SECRET": "$SECRET3",
 	}
 	env, _, err := exec.ParseEnvFile(envFile, vaultProvider, km)
 	if err != nil {
@@ -94,7 +97,8 @@ func TestComposeEnv(t *testing.T) {
 	vaultProvider := vault.NewDummyVault()
 	vaultProvider.VaultSetValue("SECRET1", "secret_value1")
 	vaultProvider.VaultSetValue("SECRET2", "secret_value2")
-	expectedEnv := []string{"ENV_VAR1=value1", "ENV_VAR2=value2", "SECRET_VAR1=secret_value1", "SECRET_VAR2=secret_value2", "COMPOSED_SECRET=secret_value1.secret_value2"}
+	vaultProvider.VaultSetValue("SECRET3", "This is a\nmultiline secret")
+	expectedEnv := []string{"ENV_VAR1=value1", "ENV_VAR2=value2", "SECRET_VAR1=secret_value1", "SECRET_VAR2=secret_value2", "COMPOSED_SECRET=secret_value1.secret_value2", "MULTILINE_SECRET=This is a\nmultiline secret"}
 	env, kv, err := exec.ParseEnvFile(envFile, vaultProvider, km)
 	if err != nil {
 		t.Errorf("Error parsing env file: %v", err)
@@ -113,5 +117,32 @@ func TestComposeEnv(t *testing.T) {
 		if composedEnv[i] != expectedEnv[i] {
 			t.Errorf("Expected composedEnv[%d] %q, but got %q", i, expectedEnv[i], composedEnv[i])
 		}
+	}
+}
+
+func TestExec(t *testing.T) {
+	cmdExec := osExec.Command("/bin/sh", "-c", "echo $SECRET_VAR1 $SECRET_VAR2 \"$MULTILINE_SECRET\"")
+	envFile := "test.env"
+	km := crypto.NewKeyManager()
+	vaultProvider := vault.NewDummyVault()
+	vaultProvider.VaultSetValue("SECRET1", "secret_value1")
+	vaultProvider.VaultSetValue("SECRET2", "secret_value2")
+	vaultProvider.VaultSetValue("SECRET3", "This is a\nmultiline secret")
+	env, kv, err := exec.ParseEnvFile(envFile, vaultProvider, km)
+	if err != nil {
+		t.Errorf("Error parsing env file: %v", err)
+	}
+	composedEnv, err := exec.ComposeEnv(env, kv)
+	if err != nil {
+		t.Errorf("Error composing env: %v", err)
+	}
+	cmdExec.Env = append(cmdExec.Env, composedEnv...)
+	output, err := cmdExec.Output()
+	if err != nil {
+		t.Errorf("Error running command: %v", err)
+	}
+	expectedOutput := "secret_value1 secret_value2 This is a\nmultiline secret\n"
+	if string(output) != expectedOutput {
+		t.Errorf("Expected %q, but got %q", expectedOutput, string(output))
 	}
 }

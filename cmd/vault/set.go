@@ -23,6 +23,7 @@ package vault
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/a13labs/sectool/cmd"
@@ -55,6 +56,28 @@ var setCmd = &cobra.Command{
 		}
 
 		vaultProvider.VaultEnableBackup(c.Flag("backup").Value.String() == "true")
+		// if args[1] starts with "file://", read from file
+		if len(args[1]) > 7 && args[1][:7] == "file://" {
+			if _, err := os.Stat(args[1][7:]); os.IsNotExist(err) {
+				fmt.Println("File does not exist.")
+				os.Exit(1)
+			}
+			v, err := os.ReadFile(args[1][7:])
+			if err != nil {
+				fmt.Println("Error reading file.")
+				os.Exit(1)
+			}
+			args[1] = string(v)
+		}
+		// if args[1] is "stdin://", read from stdin
+		if args[1] == "stdin://" {
+			v, err := io.ReadAll(os.Stdin)
+			if err != nil {
+				fmt.Println("Error reading stdin:", err)
+				return
+			}
+			args[1] = string(v)
+		}
 		err = vaultProvider.VaultSetValue(args[0], args[1])
 		if err != nil {
 			fmt.Println("Error setting key/value.")

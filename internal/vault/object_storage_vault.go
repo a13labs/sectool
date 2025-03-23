@@ -265,7 +265,7 @@ func (v *ObjectStorageVault) VaultEnableBackup(value bool) {
 
 // GetSensitiveStrings returns the sensitive strings in the vault.
 func (v *ObjectStorageVault) SetSensitiveStrings(kv *crypto.SecureKVStore) {
-	kv.Put("SECTOOL_OS_SENSITIVE_!", string(v.key))
+	kv.Put("SECTOOL_OS_SENSITIVE_1", string(v.key))
 }
 
 // isNotFoundError checks if an error is an S3 not found error.
